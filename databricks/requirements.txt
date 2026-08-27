@@ -1,0 +1,3 @@
+psycopg2-binary
+databricks-sql-connector
+python-dotenv
