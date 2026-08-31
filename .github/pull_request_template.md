@@ -6,13 +6,22 @@
 
 [preencha-me]
 
-## Recursos impactados
+## Tipo de mudança
 
-[preencha-me] | Sem impacto relevante
+- [ ] Schema (tabela/coluna/constraint)
+- [ ] View
+- [ ] Function/Procedure
+- [ ] Trigger
+- [ ] Índice
+- [ ] Dataload/seed
 
-## Rollback
+## Banco(s) afetado(s)
 
-[preencha-me] | Não vem ao caso
+[preencha-me]
+
+## É destrutiva ou difícil de reverter?
+
+[preencha-me] | Não
 
 ## Como validar
 
