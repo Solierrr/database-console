@@ -4,7 +4,10 @@ import os
 from pathlib import Path
 
 import psycopg2
+import psycopg2.extras
 from dotenv import load_dotenv
+
+psycopg2.extras.register_uuid()
 
 ENV_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
 load_dotenv(ENV_PATH)
@@ -27,5 +30,5 @@ def connect(target: str):
         dbname=os.environ[f"{prefix}_NAME"],
         user=os.environ[f"{prefix}_USER"],
         password=os.environ[f"{prefix}_PASS"],
-        sslmode="require",
+        sslmode=os.environ.get(f"{prefix}_SSLMODE", "require"),
     )
