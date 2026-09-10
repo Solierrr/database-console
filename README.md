@@ -1,49 +1,31 @@
-# database-console
+# Console dos principais Bancos de Dados
 
-Ponto central para tudo relacionado aos bancos de dados do Solaria: scripts SQL
-(schema, views analiticas, functions, procedures, triggers, indices,
-governanca e monitoramento) e os scripts Python que os aplicam e carregam
-dados de teste.
+<p>
 
-As migrations dos bancos operacionais (`api-core`, `api-auth`) continuam
-vivendo nos respectivos repositorios Spring (Flyway). Este repo nao gerencia
-o schema deles -- apenas roda scripts pontuais e hospeda o banco normalizado
-novo do projeto interdisciplinar.
+[![License](https://img.shields.io/github/license/Solierrr/web-app)](https://github.com/Solierrr/web-app/blob/main/LICENSE)
+[![GitHub Last Commit](https://img.shields.io/github/last-commit/Solierrr/web-app)](https://github.com/Solierrr/web-app/commits)
+[![GitHub Pull Requests](https://img.shields.io/github/issues-pr/Solierrr/web-app)](https://github.com/Solierrr/web-app/pulls)
+[![GitHub Contributors](https://img.shields.io/github/contributors/Solierrr/web-app)](https://github.com/Solierrr/web-app/graphs/contributors)
+[![Release](https://img.shields.io/github/v/release/Solierrr/web-app)](https://github.com/Solierrr/web-app/releases)
 
-## Estrutura
+</p>
 
-```
-db/
-  schema/       DDL do banco normalizado (tabelas, PKs, FKs), por area de dominio
-  governance/   catalogo de dados (metadados de tabelas/colunas/regras/acesso)
-  monitoring/   log de acesso e view de DAU (usuarios ativos diarios)
-  functions/    funcoes SQL de regra de negocio
-  procedures/   procedures SQL de regra de negocio
-  triggers/     triggers de auditoria (NEW/OLD/TG_OP/CURRENT_USER)
-  views/        camada de BI (star schema) com CTEs e window functions
-  indexes/      indices de otimizacao
+Repositório responsável por guardar, documentar e facilitar o uso de scripts, planejamentos e mudanças nos bancos de dados do projeto. É utilizado `Makefile` para facilitar a execução de scripts `SQL`. Todas as declarações de Triggers, Procedures, Functions, Indexes, Metadados (como Enums), entre outros; são guardados aqui nesse repositório de maneira organizada e granularizada. Além de toda organização para `SQL`, também há a presença de `python` para a execução de dataloads massivos com uso de Faker e dados pré-definidos.
 
-scripts/
-  db/           helper de conexao por banco-alvo (core, auth, analytics)
-  seed/         geracao de massa de dados de teste (Faker)
-  runner.py     aplica os .sql de uma pasta db/ contra um banco-alvo
-```
+<p>
+  <a href="https://github.com/syvixor/skills-icons">
+    <img src="https://skills.syvixor.com/api/icons?i=postgresql,python" height="64">
+  </a>
+</p>
 
-## Uso
+## Aprofunde-se no Projeto!
 
-```bash
-pip install -r requirements.txt
-cp .env.example .env   # preencher com as credenciais reais
+- [ARCHITECTURE.md](./ARCHITECTURE.md), estrutura de pastas e decisões de arquitetura do frontend.
+- [RUNNING.md](./RUNNING.md), como rodar o projeto localmente.
+- [DEPLOYMENT.md](https://github.com/Solierrr/.github/blob/main/.github/DEPLOYMENT.md), como o deploy funciona na organização.
 
-# aplica um grupo especifico contra o banco novo (analytics)
-python -m scripts.runner --target analytics --group schema
+## Contribuindo
 
-# aplica tudo, na ordem correta de dependencia
-python -m scripts.runner --target analytics --group all
-
-# gera e insere massa de dados de teste
-python -m scripts.seed.load_data --target analytics --rows 1000
-```
-
-`--target` aceita `core`, `auth` ou `analytics`, apontando para o banco
-correspondente definido no `.env`.
+- [CONTRIBUTING.md](https://github.com/Solierrr/.github/blob/main/.github/CONTRIBUTING.md), convenções de commit, branch e Pull Request.
+- [CODE_OF_CONDUCT.md](https://github.com/Solierrr/.github/blob/main/.github/CODE_OF_CONDUCT.md), código de conduta do projeto.
+- [SECURITY.md](https://github.com/Solierrr/.github/blob/main/.github/SECURITY.md), como reportar vulnerabilidades de segurança.
