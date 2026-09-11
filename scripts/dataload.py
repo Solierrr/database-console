@@ -326,7 +326,7 @@ class Seeder:
             rows.append((
                 row_id, auth_id, unique_username(),
                 maybe([pick_media("profile")[0]], p=0.5),
-                maybe([pick_media("hero")[0]], p=0.3),
+                maybe([pick_media("banner")[0]], p=0.3),
                 random.random() < 0.95,
             ))
         self.ids.setdefault("users", []).extend(r[0] for r in rows)
@@ -396,7 +396,7 @@ class Seeder:
 
     def seed_company_photo(self):
         profile_ids = self.seed_media_assets(self.n(20), "profile")
-        banner_ids = self.seed_media_assets(self.n(20), "hero")
+        banner_ids = self.seed_media_assets(self.n(20), "banner")
         rows = [(mid, pick(self.ids["company"]), "PROFILE") for mid in profile_ids]
         rows += [(mid, pick(self.ids["company"]), "BANNER") for mid in banner_ids]
         self.insert("company_photo", ["id", "fk_company", "type"], rows)
