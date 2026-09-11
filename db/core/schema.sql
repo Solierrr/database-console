@@ -61,7 +61,7 @@ CREATE TABLE contact (
 CREATE TABLE position (
     id        UUID NOT NULL DEFAULT gen_random_uuid(),
     name      VARCHAR(12) NOT NULL,
-    accesses  TEXT NOT NULL,
+    accesses  VARCHAR(255) NOT NULL,
 
     CONSTRAINT pk_position PRIMARY KEY (id)
 );
@@ -397,8 +397,8 @@ CREATE TABLE local_unit (
 CREATE TABLE unit_specifications (
     id               UUID NOT NULL DEFAULT gen_random_uuid(),
     fk_local_unit    UUID NOT NULL,
-    specifications   TEXT,
-    location_photos  TEXT,
+    specifications   VARCHAR(255),
+    location_photos  VARCHAR(255),
     date             TIMESTAMPTZ NOT NULL,
 
     CONSTRAINT pk_unit_specifications PRIMARY KEY (id),
@@ -479,7 +479,7 @@ CREATE TABLE professional_review (
     fk_reviewer     UUID NOT NULL,
     fk_service      UUID NOT NULL,
     rating          NUMERIC(2, 1) NOT NULL,
-    comment         TEXT,
+    comment         VARCHAR(255),
     active          BOOLEAN NOT NULL DEFAULT true,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
 
@@ -525,7 +525,7 @@ CREATE TABLE proposal (
     id            UUID NOT NULL DEFAULT gen_random_uuid(),
     fk_requester  UUID NOT NULL,
     status        proposal_status NOT NULL DEFAULT 'AWAITING_SUPPLIER',
-    notes         TEXT,
+    notes         VARCHAR(255),
     total_amount  NUMERIC,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ,
