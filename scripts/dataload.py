@@ -12,7 +12,9 @@ Faker.seed(42)
 random.seed(42)
 
 CLOUDINARY_DIR = Path(__file__).resolve().parent / "data" / "cloudinary"
+CATALOG_DIR = Path(__file__).resolve().parent / "data" / "catalog"
 _media_pools: dict[str, list[tuple[str, str]]] = {}
+_catalogs: dict[str, list[dict]] = {}
 
 
 def trunc(value: str, length: int) -> str: return value[:length]
@@ -31,15 +33,33 @@ def unique_username() -> str:
 
 
 def media_pool(name: str) -> list[tuple[str, str]]:
-    """Le (e cacheia) as linhas fixas de scripts/data/cloudinary/<name>.csv como (url, public_id)."""
+    """Le (e cacheia) as linhas de scripts/data/cloudinary/<name>.csv como (url, public_id).
+    Pode estar vazio -- cada arquivo cobre um unico campo de imagem e e
+    curado manualmente; use pick_media() para ter fallback automatico
+    enquanto o CSV nao foi preenchido."""
     if name not in _media_pools:
         path = CLOUDINARY_DIR / f"{name}.csv"
         with open(path, newline="", encoding="utf-8") as fh:
-            pool = [(row["url"], row["public_id"]) for row in csv.DictReader(fh)]
-        if not pool:
-            raise ValueError(f"CSV sem linhas: {path}")
-        _media_pools[name] = pool
+            _media_pools[name] = [(row["url"], row["public_id"]) for row in csv.DictReader(fh)]
     return _media_pools[name]
+
+
+def pick_media(name: str) -> tuple[str, str]:
+    """Escolhe (url, public_id) do pool <name>.csv; se o CSV ainda estiver
+    vazio, gera um placeholder via Faker para o dataload continuar rodando."""
+    pool = media_pool(name)
+    return pick(pool) if pool else (FAKE.image_url(), uuid.uuid4().hex)
+
+
+def catalog(name: str) -> list[dict]:
+    """Le (e cacheia) scripts/data/catalog/<name>.csv como lista de dicts --
+    vocabulario fixo (cargos, permissoes, planos etc.) editavel sem tocar
+    no codigo."""
+    if name not in _catalogs:
+        path = CATALOG_DIR / f"{name}.csv"
+        with open(path, newline="", encoding="utf-8") as fh:
+            _catalogs[name] = list(csv.DictReader(fh))
+    return _catalogs[name]
 
 
 class Seeder:
@@ -305,8 +325,8 @@ class Seeder:
             row_id = new_id()
             rows.append((
                 row_id, auth_id, unique_username(),
-                maybe([pick(media_pool("profile"))[0]], p=0.5),
-                maybe([pick(media_pool("hero"))[0]], p=0.3),
+                maybe([pick_media("profile")[0]], p=0.5),
+                maybe([pick_media("hero")[0]], p=0.3),
                 random.random() < 0.95,
             ))
         self.ids.setdefault("users", []).extend(r[0] for r in rows)
@@ -324,22 +344,15 @@ class Seeder:
         self.insert("person", ["id", "fk_user", "fk_contact", "name", "cpf", "birth_date"], rows)
 
     def seed_position(self):
-        names = [("ADMIN", "full access"), ("MANAGER", "company management"),
-                 ("TECHNICIAN", "field service"), ("SALES", "proposals and offers"),
-                 ("SUPPORT", "customer support")]
-        rows = [(new_id(), n, a) for n, a in names]
+        rows = [(new_id(), r["name"], r["accesses"]) for r in catalog("position")]
         self.ids["position"] = [r[0] for r in rows]
         self.insert("position", ["id", "name", "accesses"], rows)
 
     def seed_permission(self):
-        perms = [
-            ("company:read", "Ver empresas"), ("company:write", "Editar empresas"),
-            ("proposal:read", "Ver propostas"), ("proposal:write", "Editar propostas"),
-            ("catalog:read", "Ver catalogo"), ("catalog:write", "Editar catalogo"),
-            ("service:read", "Ver servicos"), ("service:write", "Editar servicos"),
-            ("billing:read", "Ver cobrancas"), ("billing:write", "Editar cobrancas"),
+        rows = [
+            (new_id(), r["permission_name"], r["permission_name"].split(":")[0].title(), r["description"])
+            for r in catalog("permission")
         ]
-        rows = [(new_id(), code, code.split(":")[0].title(), desc) for code, desc in perms]
         self.ids["permission"] = [r[0] for r in rows]
         self.insert("permission", ["id", "permission_name", "name", "description"], rows)
 
@@ -389,9 +402,7 @@ class Seeder:
         self.insert("company_photo", ["id", "fk_company", "type"], rows)
 
     def seed_company_plans(self):
-        plans = [("Basic", 99.90, "MONTHLY"), ("Pro", 249.90, "MONTHLY"),
-                  ("Pro Anual", 2399.90, "YEARLY"), ("Enterprise", 699.90, "QUARTERLY")]
-        rows = [(new_id(), n, v, c) for n, v, c in plans]
+        rows = [(new_id(), r["name"], float(r["value"]), r["cycle"]) for r in catalog("company_plans")]
         self.ids["company_plans"] = [r[0] for r in rows]
         self.insert("company_plans", ["id", "name", "value", "cycle"], rows)
 
@@ -524,9 +535,10 @@ class Seeder:
         self.insert("inventory", ["id", "fk_supplier", "fk_model", "quantity"], rows)
 
     def seed_profession(self):
-        names = ["Eletricista", "Engenheiro Eletricista", "Tecnico em Eletronica",
-                  "Instalador Solar", "Projetista", "Gestor de Obras", "Soldador", "Encanador"]
-        rows = [(new_id(), n, random.random() < 0.3, random.random() < 0.6) for n in names]
+        rows = [
+            (new_id(), r["name"], random.random() < 0.3, random.random() < 0.6)
+            for r in catalog("profession")
+        ]
         self.ids["profession"] = [r[0] for r in rows]
         self.insert("profession", ["id", "name", "accept_emergency_call", "requires_registration"], rows)
 
@@ -630,7 +642,8 @@ class Seeder:
         rows = []
         for _ in range(self.n(80)):
             rows.append((
-                new_id(), pick(self.ids["local_unit"]), FAKE.text(150), FAKE.url(),
+                new_id(), pick(self.ids["local_unit"]), FAKE.text(150),
+                pick_media("unit_specifications_photos")[0],
                 FAKE.date_time_between("-1y", "now"),
             ))
         self.insert("unit_specifications", [

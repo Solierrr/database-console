@@ -1,0 +1,11 @@
+permission_name,description
+company:read,Ver empresas
+company:write,Editar empresas
+proposal:read,Ver propostas
+proposal:write,Editar propostas
+catalog:read,Ver catalogo
+catalog:write,Editar catalogo
+service:read,Ver servicos
+service:write,Editar servicos
+billing:read,Ver cobrancas
+billing:write,Editar cobrancas

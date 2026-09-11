@@ -1,0 +1,6 @@
+name,accesses
+ADMIN,full access
+MANAGER,company management
+TECHNICIAN,field service
+SALES,proposals and offers
+SUPPORT,customer support
