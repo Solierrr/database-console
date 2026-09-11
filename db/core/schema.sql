@@ -61,7 +61,7 @@ CREATE TABLE contact (
 CREATE TABLE position (
     id        UUID NOT NULL DEFAULT gen_random_uuid(),
     name      VARCHAR(12) NOT NULL,
-    accesses  TEXT NOT NULL,
+    accesses  VARCHAR(255) NOT NULL,
 
     CONSTRAINT pk_position PRIMARY KEY (id)
 );
@@ -107,16 +107,6 @@ CREATE TABLE company_plans (
     CONSTRAINT pk_company_plans PRIMARY KEY (id)
 );
 
-CREATE TABLE certification (
-    id           UUID NOT NULL DEFAULT gen_random_uuid(),
-    name         VARCHAR(100),
-    issuer       VARCHAR(100),
-    validity     TIMESTAMP,
-    description  TEXT,
-
-    CONSTRAINT pk_certification PRIMARY KEY (id)
-);
-
 -- auth_id referencia auth_user.id no banco do api-auth (outro
 -- microsservico/banco) -- sem FK real aqui de proposito, so o valor solto.
 -- username = handle publico do usuario (ex.: "@joaosilva"), sempre minusculo
@@ -141,8 +131,8 @@ CREATE TABLE users (
 CREATE TABLE company (
     id                    UUID NOT NULL DEFAULT gen_random_uuid(),
     status                company_status NOT NULL DEFAULT 'UNDER_ANALYSIS',
-    fk_address            UUID,
-    fk_business_contact   UUID,
+    fk_address            UUID NOT NULL,
+    fk_business_contact   UUID NOT NULL,
     cnpj                  VARCHAR(14) NOT NULL,
     trade_name            VARCHAR(120) NOT NULL,
     corporate_name        VARCHAR(120) NOT NULL,
@@ -203,6 +193,17 @@ CREATE TABLE requester (
         REFERENCES company (id)
 );
 
+-- Marca uma empresa como prestadora de servico tecnico (alem de
+-- fornecedora/solicitante). Sem seed proprio ainda -- ver acompanhamento.
+CREATE TABLE technical_company (
+    id          UUID NOT NULL DEFAULT gen_random_uuid(),
+    fk_company  UUID NOT NULL,
+
+    CONSTRAINT pk_technical_company PRIMARY KEY (id),
+    CONSTRAINT fk_technical_company_company FOREIGN KEY (fk_company)
+        REFERENCES company (id)
+);
+
 CREATE TABLE technician (
     id         UUID NOT NULL DEFAULT gen_random_uuid(),
     fk_person  UUID NOT NULL,
@@ -211,6 +212,24 @@ CREATE TABLE technician (
     CONSTRAINT pk_technician PRIMARY KEY (id),
     CONSTRAINT fk_technician_person FOREIGN KEY (fk_person)
         REFERENCES person (id)
+);
+
+-- Certificacao tecnica de um tecnico especifico (ex.: NR-10, NR-35).
+-- "type" e o rotulo curto/categoria; "name"/"issuer" sao complementares.
+CREATE TABLE certification (
+    id             UUID NOT NULL DEFAULT gen_random_uuid(),
+    fk_technician  UUID NOT NULL,
+    type           VARCHAR(255) NOT NULL,
+    information    TEXT NOT NULL,
+    image          TEXT,
+    description    TEXT,
+    issuer         VARCHAR(100),
+    name           VARCHAR(100),
+    validity       TIMESTAMP,
+
+    CONSTRAINT pk_certification PRIMARY KEY (id),
+    CONSTRAINT fk_certification_technician FOREIGN KEY (fk_technician)
+        REFERENCES technician (id)
 );
 
 -- Tabela associativa company <-> users, com o cargo do usuario na empresa.
@@ -275,7 +294,7 @@ CREATE TABLE certification_record (
 
 CREATE TABLE technician_affiliation (
     id                UUID NOT NULL DEFAULT gen_random_uuid(),
-    fk_company        UUID,
+    fk_company        UUID NOT NULL,
     fk_technician     UUID NOT NULL,
     affiliation_type  technical_affiliation_type NOT NULL,
     active            BOOLEAN NOT NULL DEFAULT true,
@@ -383,7 +402,7 @@ CREATE TABLE geolocalization (
 CREATE TABLE local_unit (
     id              UUID NOT NULL DEFAULT gen_random_uuid(),
     fk_requester    UUID NOT NULL,
-    fk_address      UUID,
+    fk_address      UUID NOT NULL,
     complement      VARCHAR(255),
     location_type   location_type NOT NULL,
 
@@ -397,8 +416,8 @@ CREATE TABLE local_unit (
 CREATE TABLE unit_specifications (
     id               UUID NOT NULL DEFAULT gen_random_uuid(),
     fk_local_unit    UUID NOT NULL,
-    specifications   TEXT,
-    location_photos  TEXT,
+    specifications   VARCHAR(255),
+    location_photos  VARCHAR(255),
     date             TIMESTAMPTZ NOT NULL,
 
     CONSTRAINT pk_unit_specifications PRIMARY KEY (id),
@@ -411,10 +430,10 @@ CREATE TABLE unit_specifications (
 -- -----------------------------------------------------------------------------
 CREATE TABLE technical_project (
     id            UUID NOT NULL DEFAULT gen_random_uuid(),
-    fk_requester  UUID,
-    fk_local_unit UUID,
-    status        service_status,
-    start_date    TIMESTAMPTZ,
+    fk_requester  UUID NOT NULL,
+    fk_local_unit UUID NOT NULL,
+    status        service_status NOT NULL DEFAULT 'OPEN',
+    start_date    TIMESTAMPTZ NOT NULL DEFAULT now(),
     end_date      TIMESTAMP,
 
     CONSTRAINT pk_technical_project PRIMARY KEY (id),
@@ -479,7 +498,7 @@ CREATE TABLE professional_review (
     fk_reviewer     UUID NOT NULL,
     fk_service      UUID NOT NULL,
     rating          NUMERIC(2, 1) NOT NULL,
-    comment         TEXT,
+    comment         VARCHAR(255),
     active          BOOLEAN NOT NULL DEFAULT true,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
 
@@ -525,7 +544,7 @@ CREATE TABLE proposal (
     id            UUID NOT NULL DEFAULT gen_random_uuid(),
     fk_requester  UUID NOT NULL,
     status        proposal_status NOT NULL DEFAULT 'AWAITING_SUPPLIER',
-    notes         TEXT,
+    notes         VARCHAR(255),
     total_amount  NUMERIC,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ,
