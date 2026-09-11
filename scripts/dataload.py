@@ -19,6 +19,9 @@ _catalogs: dict[str, list[dict]] = {}
 
 def trunc(value: str, length: int) -> str: return value[:length]
 def digits(n: int) -> str: return "".join(random.choices(string.digits, k=n))
+def digits_only(value: str) -> str: return re.sub(r"\D", "", value)
+def gen_cpf() -> str: return digits_only(FAKE.cpf())
+def gen_cnpj() -> str: return digits_only(FAKE.cnpj())
 def new_id() -> uuid.UUID: return uuid.uuid4()
 def pick(seq):             return random.choice(seq)
 def maybe(seq, p=0.7):     return pick(seq) if random.random() < p else None
@@ -62,11 +65,21 @@ def catalog(name: str) -> list[dict]:
     return _catalogs[name]
 
 
+def pick_text(catalog_name: str, column: str) -> str:
+    """Escolhe um valor em portugues de scripts/data/catalog/<catalog_name>.csv.
+    Usado no lugar de FAKE.text()/FAKE.sentence()/FAKE.bs(), que geram
+    lorem ipsum pseudo-latino ou ingles mesmo com o locale pt_BR."""
+    return pick(catalog(catalog_name))[column]
+
+
 class Seeder:
-    def __init__(self, conn, scale: float):
-        self.conn = conn
+    def __init__(self, scale: float):
+        self.conn = None
         self.scale = scale
         self.ids = {}
+
+    def use_connection(self, conn) -> None:
+        self.conn = conn
 
     def n(self, base: int) -> int:
         return max(1, round(base * self.scale))
@@ -115,17 +128,6 @@ class Seeder:
                 FAKE.pydecimal(left_digits=3, right_digits=7, positive=False),
             ))
         self.insert("geolocalization", ["id", "fk_address", "latitude", "longitude"], rows)
-
-    def seed_media_assets(self, count: int, pool: str) -> list[uuid.UUID]:
-        rows = []
-        ids = []
-        for _ in range(count):
-            row_id = new_id()
-            ids.append(row_id)
-            url, public_id = pick(media_pool(pool))
-            rows.append((row_id, url, public_id, FAKE.date_time_between("-2y", "now")))
-        self.insert("media_asset", ["id", "url", "public_id", "created_at"], rows)
-        return ids
 
     def seed_auth_user(self):
         rows = []
@@ -179,7 +181,7 @@ class Seeder:
                 maybe([FAKE.date_time_between("-30d", "now")]),
             ))
         self.insert("federated_identity", [
-            "id", "fk_user", "authority", "issuer", "subject", "email", "email_verified",
+            "id", "user_id", "authority", "issuer", "subject", "email", "email_verified",
             "created_at", "last_login_at",
         ], rows)
 
@@ -198,7 +200,7 @@ class Seeder:
                 created,
             ))
         self.insert("one_time_token", [
-            "id", "fk_user", "token_hash", "type", "expires_at", "consumed_at", "created_at",
+            "id", "user_id", "token_hash", "type", "expires_at", "consumed_at", "created_at",
         ], rows)
 
     def seed_auth_session(self):
@@ -207,12 +209,14 @@ class Seeder:
             row_id = new_id()
             created = FAKE.date_time_between("-180d", "now")
             revoked = random.random() < 0.2
+            methods = random.sample(["PASSWORD", "TOTP", "FEDERATED_FIREBASE"], k=random.randint(1, 2))
             rows.append((
                 row_id,
                 pick(self.ids["auth_user"]),
                 FAKE.ipv4(),
                 trunc(FAKE.user_agent(), 500),
                 pick(["web", "android", "ios"]),
+                methods,
                 maybe([created], p=0.3),
                 created,
                 created + timedelta(days=random.randint(0, 30)),
@@ -222,16 +226,9 @@ class Seeder:
             ))
         self.ids.setdefault("auth_session", []).extend(r[0] for r in rows)
         self.insert("auth_session", [
-            "id", "fk_user", "ip_address", "user_agent", "device", "mfa_completed_at",
-            "created_at", "last_access_at", "expires_at", "revoked_at", "revocation_reason",
+            "id", "user_id", "ip_address", "user_agent", "device", "authentication_methods",
+            "mfa_completed_at", "created_at", "last_access_at", "expires_at", "revoked_at", "revocation_reason",
         ], rows)
-
-    def seed_session_authentication_method(self):
-        rows = []
-        for session_id in self.ids["auth_session"]:
-            for method in random.sample(["PASSWORD", "TOTP", "FEDERATED_FIREBASE"], k=random.randint(1, 2)):
-                rows.append((session_id, method))
-        self.insert("session_authentication_method", ["fk_session", "method"], rows)
 
     def seed_refresh_token(self):
         chain_ids = []
@@ -250,14 +247,14 @@ class Seeder:
                     chain_ids.append((previous_id, row_id))
                 previous_id = row_id
         self.insert("refresh_token", [
-            "id", "fk_session", "token_hash", "consumed_at", "revoked_at", "fk_replaced_by",
+            "id", "session_id", "token_hash", "consumed_at", "revoked_at", "replaced_by_id",
             "expires_at", "created_at",
         ], rows)
         if chain_ids:
             with self.conn.cursor() as cur:
                 execute_values(
                     cur,
-                    "UPDATE refresh_token AS rt SET fk_replaced_by = data.next_id "
+                    "UPDATE refresh_token AS rt SET replaced_by_id = data.next_id "
                     "FROM (VALUES %s) AS data (prev_id, next_id) WHERE rt.id = data.prev_id",
                     chain_ids,
                 )
@@ -274,7 +271,7 @@ class Seeder:
                 FAKE.date_time_between("-1y", "-6M"), FAKE.date_time_between("-6M", "now"),
             ))
         self.insert("totp_factor", [
-            "id", "fk_user", "secret_ciphertext", "secret_nonce", "encryption_key_id", "algorithm",
+            "id", "user_id", "secret_ciphertext", "secret_nonce", "encryption_key_id", "algorithm",
             "digits", "period_seconds", "enabled_at", "last_used_counter", "created_at", "updated_at",
         ], rows)
 
@@ -294,11 +291,11 @@ class Seeder:
                 random.random() < 0.85,
                 FAKE.ipv4(),
                 trunc(FAKE.user_agent(), 500),
-                json.dumps({"note": FAKE.sentence()}),
+                json.dumps({"note": pick_text("security_event_note", "note")}),
                 FAKE.date_time_between("-180d", "now"),
             ))
         self.insert("security_event", [
-            "id", "fk_user", "fk_session", "event_type", "succeeded", "ip_address", "user_agent",
+            "id", "user_id", "session_id", "event_type", "succeeded", "ip_address", "user_agent",
             "details", "occurred_at",
         ], rows)
 
@@ -338,10 +335,10 @@ class Seeder:
             row_id = new_id()
             rows.append((
                 row_id, user_id, maybe(self.ids["contact"]), trunc(FAKE.name(), 60),
-                digits(11), FAKE.date_of_birth(minimum_age=18, maximum_age=75),
+                gen_cpf(), FAKE.date_of_birth(minimum_age=18, maximum_age=75),
             ))
         self.ids.setdefault("person", []).extend(r[0] for r in rows)
-        self.insert("person", ["id", "fk_user", "fk_contact", "name", "cpf", "birth_date"], rows)
+        self.insert("person", ["id", "fk_users", "fk_contact", "name", "cpf", "birth_date"], rows)
 
     def seed_position(self):
         rows = [(new_id(), r["name"], r["accesses"]) for r in catalog("position")]
@@ -366,7 +363,7 @@ class Seeder:
                     continue
                 seen.add(key)
                 rows.append((new_id(), position_id, permission_id))
-        self.insert("position_permission", ["id", "fk_position", "fk_permission"], rows)
+        self.insert("position_permission", ["id", "id_position", "id_permission"], rows)
 
     def seed_business_contact(self):
         rows = []
@@ -384,22 +381,13 @@ class Seeder:
             rows.append((
                 row_id, pick(["UNDER_ANALYSIS", "APPROVED", "APPROVED", "REJECTED"]),
                 maybe(self.ids["address"]), maybe(self.ids["business_contact"]),
-                digits(14), trade_name, trunc(FAKE.company() + " " + FAKE.company_suffix(), 120),
-                pick(["INSTALLER", "DISTRIBUTOR", "MANUFACTURER", "RESELLER"]),
-                trunc(f"{trade_name}-{uuid.uuid4().hex[:8]}".lower().replace(' ', '-'), 160),
+                gen_cnpj(), trade_name, trunc(FAKE.company() + " " + FAKE.company_suffix(), 120),
             ))
         self.ids.setdefault("company", []).extend(r[0] for r in rows)
         self.insert("company", [
             "id", "status", "fk_address", "fk_business_contact", "cnpj", "trade_name",
-            "corporate_name", "business_type", "slug",
+            "corporate_name",
         ], rows)
-
-    def seed_company_photo(self):
-        profile_ids = self.seed_media_assets(self.n(20), "profile")
-        banner_ids = self.seed_media_assets(self.n(20), "banner")
-        rows = [(mid, pick(self.ids["company"]), "PROFILE") for mid in profile_ids]
-        rows += [(mid, pick(self.ids["company"]), "BANNER") for mid in banner_ids]
-        self.insert("company_photo", ["id", "fk_company", "type"], rows)
 
     def seed_company_plans(self):
         rows = [(new_id(), r["name"], float(r["value"]), r["cycle"]) for r in catalog("company_plans")]
@@ -428,7 +416,7 @@ class Seeder:
                 continue
             seen.add(key)
             rows.append((new_id(), company_id, user_id, pick(self.ids["position"])))
-        self.insert("user_company", ["id", "fk_company", "fk_user", "fk_position"], rows)
+        self.insert("user_company", ["id", "fk_company", "fk_users", "fk_position"], rows)
 
     def seed_supplier(self):
         rows = []
@@ -475,58 +463,30 @@ class Seeder:
             row_id = new_id()
             rows.append((
                 row_id, trunc(FAKE.company(), 100), trunc(FAKE.bothify("Model-###??"), 100),
-                pick(["MONOCRYSTALLINE", "POLYCRYSTALLINE", "THIN_FILM"]),
                 FAKE.pydecimal(left_digits=3, right_digits=2, positive=True),
                 FAKE.pydecimal(left_digits=2, right_digits=2, positive=True),
-                FAKE.pydecimal(left_digits=1, right_digits=2, positive=True),
                 FAKE.pydecimal(left_digits=1, right_digits=2, positive=True),
                 FAKE.pydecimal(left_digits=2, right_digits=2, positive=True),
                 pick(["APPROVED", "APPROVED", "UNDER_ANALYSIS", "REJECTED"]),
             ))
         self.ids.setdefault("model", []).extend(r[0] for r in rows)
         self.insert("model", [
-            "id", "brand", "model", "type", "power_wp", "efficiency", "width", "length", "weight", "status",
+            "id", "brand", "model", "power_wp", "efficiency", "dimension", "weight", "status",
         ], rows)
-
-    def seed_model_photo(self):
-        ids = self.seed_media_assets(self.n(40), "panels")
-        rows = [(mid, pick(self.ids["model"])) for mid in ids]
-        self.insert("model_photo", ["id", "fk_model"], rows)
 
     def seed_offer(self):
         rows = []
         for _ in range(self.n(150)):
             row_id = new_id()
-            slug = trunc(f"offer-{uuid.uuid4().hex[:12]}", 160)
             rows.append((
                 row_id, pick(self.ids["supplier"]), pick(self.ids["model"]),
                 FAKE.pydecimal(left_digits=4, right_digits=2, positive=True), random.randint(0, 500),
-                maybe([FAKE.date_time_between("now", "+1y")], p=0.5), slug,
-                maybe([FAKE.pydecimal(left_digits=2, right_digits=2, positive=True)], p=0.4),
-                maybe(["pt-BR", "en-US"], p=0.3), pick(["PENDING", "COMPLETED", "FAILED"]),
+                maybe([FAKE.date_time_between("now", "+1y")], p=0.5),
             ))
         self.ids.setdefault("offer", []).extend(r[0] for r in rows)
         self.insert("offer", [
-            "id", "fk_supplier", "fk_model", "unit_price", "availability", "expiration_date", "slug",
-            "discount_percentage", "source_locale", "translation_status",
+            "id", "fk_supplier", "fk_model", "unit_price", "availability", "expiration_date",
         ], rows)
-
-    def seed_offer_service_region(self):
-        rows = []
-        for offer_id in self.ids["offer"]:
-            for _ in range(random.randint(1, 3)):
-                rows.append((offer_id, trunc(FAKE.estado_sigla() + "-" + FAKE.city(), 120)))
-        self.insert("offer_service_region", ["fk_offer", "region"], list(set(rows)))
-
-    def seed_offer_translation(self):
-        rows = []
-        for offer_id in self.ids["offer"]:
-            for locale in random.sample(["pt-BR", "en-US", "es-ES"], k=random.randint(1, 2)):
-                rows.append((
-                    new_id(), offer_id, locale, trunc(FAKE.catch_phrase(), 160),
-                    FAKE.text(200), maybe([FAKE.text(100)], p=0.4),
-                ))
-        self.insert("offer_translation", ["id", "fk_offer", "locale", "title", "description", "details"], rows)
 
     def seed_inventory(self):
         rows = []
@@ -547,8 +507,8 @@ class Seeder:
         for _ in range(self.n(20)):
             row_id = new_id()
             rows.append((
-                row_id, trunc(FAKE.bs().title(), 100), trunc(FAKE.company(), 100),
-                FAKE.date_time_between("now", "+3y"), FAKE.text(150),
+                row_id, trunc(pick_text("certification_name", "name"), 100), trunc(FAKE.company(), 100),
+                FAKE.date_time_between("now", "+3y"), pick_text("certification_description", "description"),
             ))
         self.ids.setdefault("certification", []).extend(r[0] for r in rows)
         self.insert("certification", ["id", "name", "issuer", "validity", "description"], rows)
@@ -557,10 +517,9 @@ class Seeder:
         rows = []
         for person_id in random.sample(self.ids["person"], k=min(len(self.ids["person"]), self.n(100))):
             row_id = new_id()
-            slug = trunc(f"tech-{uuid.uuid4().hex[:12]}", 160)
-            rows.append((row_id, person_id, trunc("CREA-" + FAKE.estado_sigla() + " " + digits(6), 60), slug))
+            rows.append((row_id, person_id, trunc("CREA-" + FAKE.estado_sigla() + " " + digits(6), 60)))
         self.ids.setdefault("technician", []).extend(r[0] for r in rows)
-        self.insert("technician", ["id", "fk_person", "crea", "slug"], rows)
+        self.insert("technician", ["id", "fk_person", "crea"], rows)
 
     def seed_professional_registration(self):
         rows = []
@@ -611,7 +570,7 @@ class Seeder:
         for _ in range(self.n(15)):
             rows.append((
                 new_id(), maybe(self.ids["company"], p=0.5), trunc(FAKE.catch_phrase(), 30),
-                FAKE.text(150), FAKE.url(),
+                pick_text("business_note", "note"), FAKE.url(),
             ))
         self.insert("technical_course", ["id", "fk_company", "title", "information", "link"], rows)
 
@@ -633,16 +592,11 @@ class Seeder:
         self.ids.setdefault("local_unit", []).extend(r[0] for r in rows)
         self.insert("local_unit", ["id", "fk_requester", "fk_address", "complement", "location_type"], rows)
 
-    def seed_local_unit_photo(self):
-        ids = self.seed_media_assets(self.n(60), "units")
-        rows = [(mid, pick(self.ids["local_unit"])) for mid in ids]
-        self.insert("local_unit_photo", ["id", "fk_local_unit"], rows)
-
     def seed_unit_specifications(self):
         rows = []
         for _ in range(self.n(80)):
             rows.append((
-                new_id(), pick(self.ids["local_unit"]), FAKE.text(150),
+                new_id(), pick(self.ids["local_unit"]), pick_text("business_note", "note"),
                 pick_media("unit_specifications_photos")[0],
                 FAKE.date_time_between("-1y", "now"),
             ))
@@ -657,9 +611,8 @@ class Seeder:
                 new_id(), pick(self.ids["local_unit"]),
                 FAKE.pydecimal(left_digits=3, right_digits=2, positive=True),
                 FAKE.pydecimal(left_digits=3, right_digits=2, positive=True),
-                FAKE.image_url(), uuid.uuid4().hex,
             ))
-        self.insert("energy_bill", ["id", "fk_local_unit", "consumption", "price", "photo_url", "photo_public_id"], rows)
+        self.insert("energy_bill", ["id", "fk_local_unit", "consumption", "price"], rows)
 
     def seed_technical_project(self):
         rows = []
@@ -684,7 +637,7 @@ class Seeder:
             status = pick(["OPEN", "IN_PROGRESS", "COMPLETED", "COMPLETED", "CANCELED"])
             accepted = status != "OPEN"
             rows.append((
-                row_id, pick(self.ids["technical_project"]), trunc(FAKE.bs(), 200), status,
+                row_id, pick(self.ids["technical_project"]), pick_text("technical_service_purpose", "purpose"), status,
                 maybe([created + timedelta(days=1)], p=0.6), created,
                 pick(self.ids["users"]) if accepted else None,
                 (created + timedelta(days=1)) if accepted else None,
@@ -693,7 +646,7 @@ class Seeder:
         self.ids.setdefault("technical_service", []).extend(r[0] for r in rows)
         self.insert("technical_service", [
             "id", "fk_technical_project", "purpose", "status", "scheduled_date", "created_at",
-            "fk_accepted_by", "accepted_at", "end_date",
+            "accepted_by", "accepted_at", "end_date",
         ], rows)
 
     def seed_service_contract(self):
@@ -735,7 +688,7 @@ class Seeder:
             rows.append((
                 new_id(), technician_id, reviewer_id, service_id,
                 FAKE.pydecimal(left_digits=1, right_digits=1, positive=True, max_value=5),
-                FAKE.text(120), random.random() < 0.95, FAKE.date_time_between("-1y", "now"),
+                pick_text("review_comment", "comment"), random.random() < 0.95, FAKE.date_time_between("-1y", "now"),
             ))
         self.insert("professional_review", [
             "id", "fk_professional", "fk_reviewer", "fk_service", "rating", "comment", "active", "created_at",
@@ -749,7 +702,7 @@ class Seeder:
             rows.append((
                 row_id, pick(self.ids["requester"]),
                 pick(["AWAITING_SUPPLIER", "AWAITING_REQUESTER", "ACCEPTED", "REJECTED", "CANCELED"]),
-                maybe([FAKE.text(100)], p=0.5), None, created,
+                maybe([pick_text("business_note", "note")], p=0.5), None, created,
                 maybe([created + timedelta(days=random.randint(1, 20))], p=0.6),
             ))
         self.ids.setdefault("proposal", []).extend(r[0] for r in rows)
@@ -776,14 +729,28 @@ class Seeder:
         for proposal_item_id in self.ids["proposal_item"]:
             rows.append((
                 new_id(), proposal_item_id, pick(self.ids["local_unit"]), random.randint(1, 5),
-                maybe([FAKE.sentence()], p=0.3),
+                maybe([pick_text("business_note", "note")], p=0.3),
             ))
         self.insert("proposal_unit", ["id", "fk_proposal_item", "fk_local_unit", "quantity", "note"], rows)
 
     def recompute_proposal_totals(self):
+        # fn_proposal_total() nunca existiu no banco (nem em db/core/procedures,
+        # que esta vazio) -- soma direto via proposal_item x offer.
         with self.conn.cursor() as cur:
-            cur.execute("UPDATE proposal SET total_amount = fn_proposal_total(id)")
-        print(f"  proposal.total_amount recalculado via fn_proposal_total()")
+            cur.execute("""
+                UPDATE proposal p
+                SET total_amount = sub.total
+                FROM (
+                    SELECT pi.fk_proposal AS proposal_id,
+                           SUM(pi.quantity * COALESCE(pi.negotiated_price, o.unit_price)
+                               - COALESCE(pi.discount, 0)) AS total
+                    FROM proposal_item pi
+                    JOIN offer o ON o.id = pi.fk_offer
+                    GROUP BY pi.fk_proposal
+                ) sub
+                WHERE p.id = sub.proposal_id
+            """)
+        print("  proposal.total_amount recalculado (soma de proposal_item x offer)")
 
     def seed_flux_log(self):
         rows = []
@@ -799,66 +766,63 @@ class Seeder:
         self.insert("flux_log", ["id", "fk_user", "action", "created_at"], rows)
 
 
-USAGE = "uso: python -m scripts.dataload <core|auth|analytics> [rows]"
-TARGETS = ("core", "auth", "analytics")
+USAGE = "uso: python -m scripts.dataload [rows]"
+
+# auth_user e as tabelas que dependem dele vivem no banco do api-auth;
+# users e tudo o resto vive no banco do api-core -- sao dois bancos
+# Postgres fisicamente separados, entao precisam de duas conexoes. A fase
+# auth roda primeiro porque users.auth_id referencia os IDs gerados aqui.
+AUTH_STEPS = [
+    "seed_auth_user", "seed_local_credential", "seed_federated_identity",
+    "seed_one_time_token", "seed_auth_session",
+    "seed_refresh_token", "seed_totp_factor", "seed_security_event", "seed_outbox_event",
+]
+
+CORE_STEPS = [
+    "seed_address", "seed_contact", "seed_geolocalization",
+    "seed_users", "seed_person",
+    "seed_position", "seed_permission", "seed_position_permission",
+    "seed_business_contact", "seed_company",
+    "seed_company_plans", "seed_company_positions", "seed_user_company",
+    "seed_supplier", "seed_subscription", "seed_charge",
+    "seed_model", "seed_offer", "seed_inventory",
+    "seed_profession", "seed_certification", "seed_technician",
+    "seed_professional_registration", "seed_certification_record",
+    "seed_technician_affiliation", "seed_shift", "seed_technical_course",
+    "seed_requester", "seed_local_unit", "seed_unit_specifications", "seed_energy_bill",
+    "seed_technical_project", "seed_technical_service",
+    "seed_service_contract", "seed_service_executor", "seed_professional_review",
+    "seed_proposal", "seed_proposal_item", "seed_proposal_unit", "recompute_proposal_totals",
+    "seed_flux_log",
+]
 
 
-def main():
-    if len(sys.argv) < 2:
-        sys.exit(USAGE)
-
-    target: str = sys.argv[1]
-    if target not in TARGETS:
-        sys.exit(f"target invalido: {target!r}. {USAGE}")
-
-    # rows e a referencia de escala (default: 1000)
-    rows: int = int(sys.argv[2]) if len(sys.argv) > 2 else 1000
-
-    scale = rows / 1000.0
+def run_phase(seeder: Seeder, target: str, step_names: list[str]) -> None:
     conn = connect(target)
-    seeder = Seeder(conn, scale)
-
-    steps = [
-        seeder.seed_address, seeder.seed_contact, seeder.seed_geolocalization,
-        seeder.seed_auth_user, seeder.seed_local_credential,
-        # users precisa existir antes de auth_session para a trigger de
-        # DAU (fn_log_access) conseguir resolver fk_auth_user -> users.id.
-        seeder.seed_users, seeder.seed_person,
-        seeder.seed_federated_identity,
-        seeder.seed_one_time_token, seeder.seed_auth_session, seeder.seed_session_authentication_method,
-        seeder.seed_refresh_token, seeder.seed_totp_factor, seeder.seed_security_event,
-        seeder.seed_outbox_event,
-        seeder.seed_position, seeder.seed_permission,
-        seeder.seed_position_permission,
-        seeder.seed_business_contact, seeder.seed_company, seeder.seed_company_photo,
-        seeder.seed_company_plans, seeder.seed_company_positions, seeder.seed_user_company,
-        seeder.seed_supplier, seeder.seed_subscription, seeder.seed_charge,
-        seeder.seed_model, seeder.seed_model_photo, seeder.seed_offer,
-        seeder.seed_offer_service_region, seeder.seed_offer_translation, seeder.seed_inventory,
-        seeder.seed_profession, seeder.seed_certification, seeder.seed_technician,
-        seeder.seed_professional_registration, seeder.seed_certification_record,
-        seeder.seed_technician_affiliation, seeder.seed_shift, seeder.seed_technical_course,
-        seeder.seed_requester, seeder.seed_local_unit, seeder.seed_local_unit_photo,
-        seeder.seed_unit_specifications, seeder.seed_energy_bill,
-        seeder.seed_technical_project, seeder.seed_technical_service,
-        seeder.seed_service_contract, seeder.seed_service_executor, seeder.seed_professional_review,
-        seeder.seed_proposal, seeder.seed_proposal_item, seeder.seed_proposal_unit,
-        seeder.recompute_proposal_totals,
-        seeder.seed_flux_log,
-    ]
-
+    seeder.use_connection(conn)
     try:
-        for step in steps:
-            print(f"[seed] {step.__name__} ...")
-            step()
+        for name in step_names:
+            print(f"[seed:{target}] {name} ...")
+            getattr(seeder, name)()
         conn.commit()
-        print("[seed] concluido e commitado.")
+        print(f"[seed:{target}] concluido e commitado.")
     except Exception:
         conn.rollback()
-        print("[seed] FALHOU, alteracoes revertidas.")
+        print(f"[seed:{target}] FALHOU, alteracoes revertidas.")
         raise
     finally:
         conn.close()
+
+
+def main():
+    # rows e a referencia de escala (default: 1000)
+    rows: int = int(sys.argv[1]) if len(sys.argv) > 1 else 1000
+
+    scale = rows / 1000.0
+    seeder = Seeder(scale)
+
+    run_phase(seeder, "auth", AUTH_STEPS)
+    run_phase(seeder, "core", CORE_STEPS)
 
 
 if __name__ == "__main__":

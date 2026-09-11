@@ -41,8 +41,12 @@ reset:
 	$(PSQL) db/$(TARGET)/seed.sql
 	$(PSQL) db/$(TARGET)/indexes.sql
 
+### dataload nao usa TARGET: auth_user/users compartilham UUID entre
+### coredb e authdb, entao sempre popula os dois bancos juntos (ver
+### scripts/dataload.py -- AUTH_STEPS roda contra authdb, CORE_STEPS
+### contra coredb, na mesma execucao).
 dataload:
-	python -m scripts.dataload $(TARGET) $(ROWS)
+	python -m scripts.dataload $(ROWS)
 
 backup:
 	pg_dump "$(DATABASE_URI)" > db/$(TARGET)/backup.sql
