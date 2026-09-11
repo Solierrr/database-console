@@ -12,11 +12,11 @@
 -- =============================================================================
 
 -- Usuarios de plataforma, ligados aos auth_user do banco do api-auth.
-INSERT INTO users (id, auth_id, active)
-VALUES ('33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111', true);
+INSERT INTO users (id, auth_id, username, active)
+VALUES ('33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111', 'requester_demo', true);
 
-INSERT INTO users (id, auth_id, active)
-VALUES ('44444444-4444-4444-4444-444444444444', '22222222-2222-2222-2222-222222222222', true);
+INSERT INTO users (id, auth_id, username, active)
+VALUES ('44444444-4444-4444-4444-444444444444', '22222222-2222-2222-2222-222222222222', 'supplier_demo', true);
 
 -- Empresa fornecedora.
 INSERT INTO address (id, state, city, zip_code, street, number)

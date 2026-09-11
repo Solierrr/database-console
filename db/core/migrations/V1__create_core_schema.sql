@@ -203,14 +203,20 @@ CREATE TABLE certification (
 
 -- auth_id referencia auth_user.id no banco do api-auth (outro
 -- microsservico/banco) -- sem FK real aqui de proposito, so o valor solto.
+-- username = handle publico do usuario (ex.: "@joaosilva"), sempre minusculo
+-- e distinto do nome legal armazenado em person.name.
 CREATE TABLE users (
-    id       UUID NOT NULL DEFAULT gen_random_uuid(),
-    auth_id  UUID NOT NULL,
-    avatar   VARCHAR(255),
-    active   BOOLEAN NOT NULL DEFAULT true,
+    id        UUID NOT NULL DEFAULT gen_random_uuid(),
+    auth_id   UUID NOT NULL,
+    username  VARCHAR(30) NOT NULL,
+    avatar    VARCHAR(255),
+    banner    VARCHAR(255),
+    active    BOOLEAN NOT NULL DEFAULT true,
 
     CONSTRAINT pk_users PRIMARY KEY (id),
-    CONSTRAINT uq_users_auth_id UNIQUE (auth_id)
+    CONSTRAINT uq_users_auth_id UNIQUE (auth_id),
+    CONSTRAINT uq_users_username UNIQUE (username),
+    CONSTRAINT ck_users_username_format CHECK (username ~ '^[a-z0-9_]{3,30}$')
 );
 
 -- -----------------------------------------------------------------------------
