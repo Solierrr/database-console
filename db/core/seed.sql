@@ -62,10 +62,18 @@ VALUES (
 );
 
 -- Empresa solicitante, com uma unidade de instalacao.
-INSERT INTO company (id, status, cnpj, trade_name, corporate_name)
+INSERT INTO address (id, state, city, zip_code, street, number)
+VALUES ('99999999-1111-1111-1111-111111111111', 'SP', 'Campinas', '13010000', 'Rua das Flores', '250');
+
+INSERT INTO business_contact (id, company_email, phone)
+VALUES ('88888888-1111-1111-1111-111111111111', 'contato@requester-demo.dev', '11999991111');
+
+INSERT INTO company (id, status, fk_address, fk_business_contact, cnpj, trade_name, corporate_name)
 VALUES (
     'bbbbbbbb-1111-1111-1111-111111111111',
     'APPROVED',
+    '99999999-1111-1111-1111-111111111111',
+    '88888888-1111-1111-1111-111111111111',
     '11111111000191',
     'Requester Demo',
     'Requester Demo Energia Ltda'
