@@ -1,4 +1,4 @@
-import csv, json, random, string, sys, uuid
+import csv, json, random, re, string, sys, uuid
 
 from faker import Faker
 from datetime import timedelta
@@ -20,6 +20,14 @@ def digits(n: int) -> str: return "".join(random.choices(string.digits, k=n))
 def new_id() -> uuid.UUID: return uuid.uuid4()
 def pick(seq):             return random.choice(seq)
 def maybe(seq, p=0.7):     return pick(seq) if random.random() < p else None
+
+
+def unique_username() -> str:
+    """Handle publico unico (@user), sempre minusculo -- combina com
+    ck_users_username_format em db/core/schema.sql."""
+    raw = re.sub(r"[^a-z0-9_]", "_", FAKE.unique.user_name().lower())
+    raw = trunc(raw, 30)
+    return raw if len(raw) >= 3 else raw.ljust(3, "0")
 
 
 def media_pool(name: str) -> list[tuple[str, str]]:
@@ -295,9 +303,14 @@ class Seeder:
         rows = []
         for auth_id in self.ids["auth_user"]:
             row_id = new_id()
-            rows.append((row_id, auth_id, maybe([FAKE.image_url()], p=0.5), random.random() < 0.95))
+            rows.append((
+                row_id, auth_id, unique_username(),
+                maybe([pick(media_pool("profile"))[0]], p=0.5),
+                maybe([pick(media_pool("hero"))[0]], p=0.3),
+                random.random() < 0.95,
+            ))
         self.ids.setdefault("users", []).extend(r[0] for r in rows)
-        self.insert("users", ["id", "fk_auth_user", "avatar", "active"], rows)
+        self.insert("users", ["id", "auth_id", "username", "avatar", "banner", "active"], rows)
 
     def seed_person(self):
         rows = []
@@ -341,13 +354,6 @@ class Seeder:
                 seen.add(key)
                 rows.append((new_id(), position_id, permission_id))
         self.insert("position_permission", ["id", "fk_position", "fk_permission"], rows)
-
-    def seed_user_photo(self):
-        profile_ids = self.seed_media_assets(self.n(20), "profile")
-        banner_ids = self.seed_media_assets(self.n(20), "hero")
-        rows = [(mid, pick(self.ids["users"]), "PROFILE") for mid in profile_ids]
-        rows += [(mid, pick(self.ids["users"]), "BANNER") for mid in banner_ids]
-        self.insert("user_photo", ["id", "fk_user", "type"], rows)
 
     def seed_business_contact(self):
         rows = []
@@ -810,7 +816,7 @@ def main():
         seeder.seed_refresh_token, seeder.seed_totp_factor, seeder.seed_security_event,
         seeder.seed_outbox_event,
         seeder.seed_position, seeder.seed_permission,
-        seeder.seed_position_permission, seeder.seed_user_photo,
+        seeder.seed_position_permission,
         seeder.seed_business_contact, seeder.seed_company, seeder.seed_company_photo,
         seeder.seed_company_plans, seeder.seed_company_positions, seeder.seed_user_company,
         seeder.seed_supplier, seeder.seed_subscription, seeder.seed_charge,
