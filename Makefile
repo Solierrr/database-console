@@ -1,6 +1,6 @@
 include .env
 
-.PHONY: migrate schema seed dataload indexes enums reset reset-mongo backup
+.PHONY: migrate schema seed dataload indexes enums reset reset-mongo backup deps-windows
 
 TARGET ?= local
 ENVIRONMENT ?= local
@@ -65,4 +65,11 @@ dataload:
 
 backup:
 	pg_dump "$(DATABASE_URI)" > db/$(TARGET)/backup.sql
+
+### instala via winget (nativo no Windows 10/11) as ferramentas de linha
+### de comando usadas pelos targets acima: psql/pg_dump, python e mongosh.
+deps-windows:
+	winget install --id PostgreSQL.PostgreSQL.16 -e
+	winget install --id Python.Python.3.12 -e
+	winget install --id MongoDB.Shell -e
 
