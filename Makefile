@@ -1,6 +1,6 @@
 include .env
 
-.PHONY: migrate schema seed dataload indexes enums reset backup
+.PHONY: migrate schema seed dataload indexes enums reset reset-mongo backup
 
 TARGET ?= local
 ENVIRONMENT ?= local
@@ -20,6 +20,11 @@ DATABASE_URI = postgresql://$(USER):$(PASSWORD)@$(HOST):$(PORT)/$(DB_NAME)
 ### reset precisa de uma conexao de manutencao -- nao da pra DROP DATABASE
 ### estando conectado nele mesmo.
 MAINT_URI = postgresql://$(USER):$(PASSWORD)@$(HOST):$(PORT)/postgres
+
+### mongo nao tem sufixo qa/prod no nome do banco -- o Infisical ja
+### entrega DB_MONGO_URI/DB_MONGO_MESSENGER com o valor certo por
+### ambiente (mesma convencao do api-messenger).
+MONGO_URI = $(DB_MONGO_URI)/$(DB_MONGO_MESSENGER)
 
 ### Syntax Examples:
 ### - make {command} TARGET={database} ENVIRONMENT={environment}
@@ -47,6 +52,9 @@ reset:
 	$(PSQL) db/$(TARGET)/enums.sql
 	$(PSQL) db/$(TARGET)/seed.sql
 	$(PSQL) db/$(TARGET)/indexes.sql
+
+reset-mongo:
+	mongosh "$(MONGO_URI)" db/messenger/reset.js
 
 ### dataload nao usa TARGET: auth_user/users compartilham UUID entre
 ### coredb e authdb, entao sempre popula os dois bancos juntos (ver

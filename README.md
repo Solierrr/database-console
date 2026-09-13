@@ -14,7 +14,7 @@ Repositório responsável por guardar, documentar e facilitar o uso de scripts, 
 
 <p>
   <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=postgresql,python" height="64">
+    <img src="https://skills.syvixor.com/api/icons?i=postgresql,mongodb,python" height="64">
   </a>
 </p>
 
