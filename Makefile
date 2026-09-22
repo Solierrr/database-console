@@ -41,8 +41,8 @@ enums:
 
 reset:
 	psql "$(MAINT_URI)" -f db/reset.sql -v DB=$(DB_NAME)
-	$(PSQL) db/$(TARGET)/schema.sql
 	$(PSQL) db/$(TARGET)/enums.sql
+	$(PSQL) db/$(TARGET)/schema.sql
 	$(PSQL) db/$(TARGET)/seed.sql
 	$(PSQL) db/$(TARGET)/indexes.sql
 
