@@ -1,6 +1,6 @@
 include .env
 
-.PHONY: migrate schema seed dataload indexes enums reset reset-mongo backup deps-windows
+.PHONY: migrate schema seed dataload indexes enums reset reset-mongo connect backup deps-windows
 
 TARGET ?= local
 ENVIRONMENT ?= local
@@ -48,6 +48,9 @@ reset:
 
 reset-mongo:
 	mongosh "$(MONGO_URI)" db/messenger/reset.js
+
+connect:
+	psql "$(DATABASE_URI)"
 
 dataload:
 	python -m scripts.dataload $(ROWS)
