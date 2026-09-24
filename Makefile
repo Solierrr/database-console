@@ -1,6 +1,19 @@
 include .env
 
-.PHONY: migrate schema seed dataload indexes enums reset reset-mongo connect backup deps-windows
+ORG_SCRIPTS_DIR ?= $(HOME)/.local/share/solierrr-infra-scripts
+ORG_SCRIPTS_POWERSHELL ?= powershell
+EXTRACT_ENV := $(ORG_SCRIPTS_DIR)/scripts/extract-env.ps1
+SERVICE := database-console
+ENV ?= local
+OUT ?= .env
+
+.PHONY: tools-check env migrate schema seed dataload indexes enums reset reset-mongo connect backup deps-windows
+
+tools-check:
+	@test -f "$(EXTRACT_ENV)" || { echo "error: infra-scripts was not found at $(ORG_SCRIPTS_DIR)"; exit 1; }
+
+env: tools-check
+	$(ORG_SCRIPTS_POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "$(EXTRACT_ENV)" -Service "$(SERVICE)" -Environment "$(ENV)" -OutputPath "$(OUT)"
 
 TARGET ?= local
 ENVIRONMENT ?= local
