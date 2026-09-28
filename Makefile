@@ -14,7 +14,7 @@ OUT ?= .env
 
 
 
-.PHONY: vault-config vault-auth extract-env tools-check env migrate schema seed dataload indexes enums reset reset-mongo connect backup deps-windows install
+.PHONY: vault-config vault-auth extract-env tools-check env migrate schema seed dataload indexes enums reset reset-mongo connect backup export-parquet deps-windows install
 
 
 
@@ -76,6 +76,9 @@ dataload:
 
 backup:
 	$(ORG_SCRIPTS_POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File scripts/backup-postgres.ps1 -Target "$(if $(filter command line,$(origin TARGET)),$(TARGET),)"
+
+export-parquet:
+	python scripts/export_parquet.py --target "$(if $(filter command line,$(origin TARGET)),$(TARGET),)"
 
 install:
 	winget install --id PostgreSQL.PostgreSQL.16 -e

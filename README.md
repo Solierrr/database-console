@@ -26,6 +26,8 @@ Extraia as credenciais do ambiente desejado com `make extract-env SERVICE=databa
 
 Os dumps podem conter dados sensíveis. Mantenha os arquivos fora do Git e compartilhe apenas por um canal aprovado pela equipe.
 
+Para carregar dados no Databricks, use `make export-parquet TARGET=core` (ou `TARGET=auth` / `TARGET=all`). Sem `TARGET`, o comando pergunta qual banco exportar. Instale as dependências com `python -m pip install -r scripts/requirements.txt`. O exportador transmite as tabelas em lotes e cria uma pasta Parquet por tabela, com compressão Snappy, além de um `manifest.json`, em `exports/<ambiente>/<banco>/<data-hora-UTC>/`. Copie essa pasta para o armazenamento acessível ao Databricks; cada tabela pode ser lida separadamente, por exemplo `spark.read.parquet("<caminho>/public__company")`. Tipos UUID e enums viram texto; JSON e arrays viram texto JSON; números, datas, timestamps, booleanos e binários mantêm tipos Parquet compatíveis.
+
 ## Aprofunde-se no Projeto!
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md), estrutura de pastas e decisões de arquitetura do frontend.
