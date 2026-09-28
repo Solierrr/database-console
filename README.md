@@ -18,6 +18,14 @@ Repositório responsável por guardar, documentar e facilitar o uso de scripts, 
   </a>
 </p>
 
+## Segredos e backup PostgreSQL
+
+Extraia as credenciais do ambiente desejado com `make extract-env SERVICE=database-console ENV=qa`. Sem argumentos, `make extract-env` pergunta o serviço e o ambiente. O arquivo `.env` é local e ignorado pelo Git.
+
+`make backup` pergunta qual banco PostgreSQL salvar: `core`, `auth` ou ambos. Para executar sem menu, use `make backup TARGET=core`, `make backup TARGET=auth` ou `make backup TARGET=all`. O comando usa `DB_POSTGRES_*` do `.env` e grava arquivos SQL com data e hora em `backups/<ambiente>/`, diretório ignorado pelo Git. Para mudar o ambiente do backup, extraia primeiro o `.env` correspondente. O banco MongoDB de `messenger` não é incluído em `pg_dump`.
+
+Os dumps podem conter dados sensíveis. Mantenha os arquivos fora do Git e compartilhe apenas por um canal aprovado pela equipe.
+
 ## Aprofunde-se no Projeto!
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md), estrutura de pastas e decisões de arquitetura do frontend.

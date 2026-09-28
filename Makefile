@@ -75,7 +75,7 @@ dataload:
 	python -m scripts.dataload $(ROWS)
 
 backup:
-	pg_dump "$(DATABASE_URI)" > db/$(TARGET)/backup.sql
+	$(ORG_SCRIPTS_POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File scripts/backup-postgres.ps1 -Target "$(if $(filter command line,$(origin TARGET)),$(TARGET),)"
 
 install:
 	winget install --id PostgreSQL.PostgreSQL.16 -e
