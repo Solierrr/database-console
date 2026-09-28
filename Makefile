@@ -1,61 +1,41 @@
 include .env
-
-ORG_SCRIPTS_DIR ?= $(HOME)/.local/share/solierrr-infra-scripts
-ORG_SCRIPTS_REPO ?= https://github.com/Solierrr/infra-scripts.git
+ifeq ($(OS),Windows_NT)
+ORG_SCRIPTS_DIR ?= $(USERPROFILE)/.local/share/solierrr-infra-scripts
 ORG_SCRIPTS_POWERSHELL ?= powershell
+else
+ORG_SCRIPTS_DIR ?= $(HOME)/.local/share/solierrr-infra-scripts
+ORG_SCRIPTS_POWERSHELL ?= pwsh
+endif
+ORG_SCRIPTS_REPO ?= https://github.com/Solierrr/infra-scripts.git
 EXTRACT_ENV := $(ORG_SCRIPTS_DIR)/scripts/extract-env.ps1
-SERVICE := database-console
-ENV ?= local
+SERVICE ?=
+ENV ?=
 OUT ?= .env
 
-.PHONY: vault-config vault-auth extract-env tools-check env migrate schema seed dataload indexes enums reset reset-mongo connect backup deps-windows
 
-vault-config:
-	@if [ -d "$(ORG_SCRIPTS_DIR)/.git" ]; then \
-		echo "infra-scripts found at $(ORG_SCRIPTS_DIR), updating..."; \
-		git -C "$(ORG_SCRIPTS_DIR)" pull --ff-only || { echo "error: 'git pull --ff-only' failed in $(ORG_SCRIPTS_DIR). Resolve manually, then run 'make vault-config' again."; exit 1; }; \
-	elif [ -e "$(ORG_SCRIPTS_DIR)" ]; then \
-		echo "error: $(ORG_SCRIPTS_DIR) exists but is not a git clone. Remove or rename it, then run 'make vault-config' again."; exit 1; \
-	else \
-		echo "infra-scripts not found, cloning into $(ORG_SCRIPTS_DIR)..."; \
-		git clone "$(ORG_SCRIPTS_REPO)" "$(ORG_SCRIPTS_DIR)" || { echo "error: failed to clone $(ORG_SCRIPTS_REPO). Check your network/access, then run 'make vault-config' again."; exit 1; }; \
-	fi
-	@test -f "$(EXTRACT_ENV)" || { echo "error: infra-scripts was cloned/updated but $(EXTRACT_ENV) is missing. Check if the script was renamed or moved upstream."; exit 1; }
-	@echo "OK: infra-scripts ready at $(ORG_SCRIPTS_DIR)"
 
-vault-auth: vault-config
-	@command -v infisical >/dev/null 2>&1 || { echo "error: Infisical CLI not installed. Install it (https://infisical.com/docs/cli/overview), then run 'make vault-auth' again."; exit 1; }
-	@infisical user get token --silent >/dev/null 2>&1 || { \
-		echo "error: no active Infisical session."; \
-		echo "Run: infisical login"; \
-		echo "Then run 'make extract-env' again."; \
-		exit 1; \
-	}
-	@echo "OK: Infisical authenticated."
+.PHONY: vault-config vault-auth extract-env tools-check env migrate schema seed dataload indexes enums reset reset-mongo connect backup deps-windows install
 
-extract-env: vault-auth
-	@test -n "$(SERVICE)" || { echo "error: SERVICE not set. Example: make extract-env SERVICE=database-console"; exit 1; }
-	@case "$(ENV)" in local|qa|prod) : ;; *) echo "error: invalid ENV '$(ENV)'. Use local, qa or prod (example: make extract-env ENV=qa)"; exit 1;; esac
-	$(ORG_SCRIPTS_POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "$(EXTRACT_ENV)" -Service "$(SERVICE)" -Environment "$(ENV)" -OutputPath "$(OUT)"
 
-tools-check: vault-config
-env: extract-env
+
+
 
 TARGET ?= local
 ENVIRONMENT ?= local
 ROWS ?= 1000
 
-ifeq ($(ENVIRONMENT),qa)
+ifneq ($(filter qa QA "qa" "QA",$(ENVIRONMENT)),)
 	SUFIX = qa
 else
 	SUFIX =
 endif
 
-DB_NAME = $(TARGET)db$(SUFIX)
-DATABASE_URI = postgresql://$(USER):$(PASSWORD)@$(HOST):$(PORT)/$(DB_NAME)
-MAINT_URI = postgresql://$(USER):$(PASSWORD)@$(HOST):$(PORT)/postgres
+unquote = $(subst ",,$(1))
+DB_NAME = $(call unquote,$(TARGET))db$(SUFIX)
+DATABASE_URI = postgresql://$(call unquote,$(USER)):$(call unquote,$(PASSWORD))@$(call unquote,$(HOST)):$(call unquote,$(PORT))/$(DB_NAME)
+MAINT_URI = postgresql://$(call unquote,$(USER)):$(call unquote,$(PASSWORD))@$(call unquote,$(HOST)):$(call unquote,$(PORT))/postgres
 
-MONGO_URI = $(DB_MONGO_URI)/$(DB_MONGO_MESSENGER)
+MONGO_URI = $(call unquote,$(DB_MONGO_URI))/$(call unquote,$(DB_MONGO_MESSENGER))
 
 ### - make {command}
 ### - make {command} TARGET={database}
@@ -101,3 +81,16 @@ install:
 	winget install --id PostgreSQL.PostgreSQL.16 -e
 	winget install --id Python.Python.3.12 -e
 	winget install --id MongoDB.Shell -e
+
+vault-config: ## Clone or update the shared infra-scripts toolkit
+	$(ORG_SCRIPTS_POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File scripts/make-vault.ps1 -Action config -ScriptsDir "$(ORG_SCRIPTS_DIR)" -Repo "$(ORG_SCRIPTS_REPO)" -ExtractEnvPath "$(EXTRACT_ENV)"
+
+vault-auth: vault-config ## Check that the Infisical CLI is installed and authenticated
+	$(ORG_SCRIPTS_POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File scripts/make-vault.ps1 -Action auth
+
+extract-env: vault-auth ## Generate a local environment file; prompts for missing service/environment
+	$(ORG_SCRIPTS_POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File scripts/make-vault.ps1 -Action extract-env -ExtractEnvPath "$(EXTRACT_ENV)" -Service "$(SERVICE)" -Environment "$(ENV)" -OutputPath "$(OUT)"
+
+tools-check: vault-config ## Alias for vault-config
+
+env: extract-env ## Alias for extract-env
