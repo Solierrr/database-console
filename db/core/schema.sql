@@ -685,3 +685,15 @@ CREATE TABLE access_code (
     CONSTRAINT ck_access_code_status CHECK (status IN ('ACTIVE', 'USED', 'REVOKED'))
 );
 CREATE INDEX idx_access_code_company ON access_code (fk_company);
+
+-- Admin Solaria: super-admin de plataforma, desacoplado de user_company/position.
+CREATE TABLE platform_admin (
+    id         UUID NOT NULL DEFAULT gen_random_uuid(),
+    fk_user    UUID NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_platform_admin PRIMARY KEY (id),
+    CONSTRAINT uq_platform_admin_user UNIQUE (fk_user),
+    CONSTRAINT fk_platform_admin_user FOREIGN KEY (fk_user)
+        REFERENCES users (id)
+);
