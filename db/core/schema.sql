@@ -63,7 +63,8 @@ CREATE TABLE position (
     name      VARCHAR(12) NOT NULL,
     accesses  VARCHAR(255) NOT NULL,
 
-    CONSTRAINT pk_position PRIMARY KEY (id)
+    CONSTRAINT pk_position PRIMARY KEY (id),
+    CONSTRAINT uq_position_name UNIQUE (name)
 );
 
 CREATE TABLE permission (
@@ -91,11 +92,14 @@ CREATE TABLE model (
     model        VARCHAR(255) NOT NULL,
     power_wp     NUMERIC NOT NULL,
     efficiency   NUMERIC NOT NULL,
-    dimension    NUMERIC NOT NULL,
+    type         VARCHAR(32) NOT NULL,
+    width        NUMERIC NOT NULL,
+    length       NUMERIC NOT NULL,
     weight       NUMERIC NOT NULL,
     status       model_status NOT NULL DEFAULT 'UNDER_ANALYSIS',
 
-    CONSTRAINT pk_model PRIMARY KEY (id)
+    CONSTRAINT pk_model PRIMARY KEY (id),
+    CONSTRAINT ck_model_type CHECK (type IN ('MONOCRYSTALLINE', 'POLYCRYSTALLINE', 'THIN_FILM'))
 );
 
 CREATE TABLE company_plans (
@@ -118,6 +122,7 @@ CREATE TABLE users (
     avatar    VARCHAR(255),
     banner    VARCHAR(255),
     active    BOOLEAN NOT NULL DEFAULT true,
+    connections UUID[] NOT NULL DEFAULT ARRAY[]::uuid[],
 
     CONSTRAINT pk_users PRIMARY KEY (id),
     CONSTRAINT uq_users_auth_id UNIQUE (auth_id),
@@ -131,11 +136,13 @@ CREATE TABLE users (
 CREATE TABLE company (
     id                    UUID NOT NULL DEFAULT gen_random_uuid(),
     status                company_status NOT NULL DEFAULT 'UNDER_ANALYSIS',
-    fk_address            UUID NOT NULL,
-    fk_business_contact   UUID NOT NULL,
+    type                  VARCHAR(16) NOT NULL CHECK (type IN ('SUPPLIER', 'DEMANDANT')),
+    fk_address            UUID,
+    fk_business_contact   UUID,
     cnpj                  VARCHAR(14) NOT NULL,
     trade_name            VARCHAR(120) NOT NULL,
     corporate_name        VARCHAR(120) NOT NULL,
+    slug                  VARCHAR(160) NOT NULL UNIQUE,
 
     CONSTRAINT pk_company PRIMARY KEY (id),
     CONSTRAINT fk_company_address FOREIGN KEY (fk_address)
@@ -208,6 +215,7 @@ CREATE TABLE technician (
     id         UUID NOT NULL DEFAULT gen_random_uuid(),
     fk_person  UUID NOT NULL,
     crea       VARCHAR(255) NOT NULL,
+    slug       VARCHAR(160) NOT NULL UNIQUE,
 
     CONSTRAINT pk_technician PRIMARY KEY (id),
     CONSTRAINT fk_technician_person FOREIGN KEY (fk_person)
@@ -240,6 +248,7 @@ CREATE TABLE user_company (
     fk_position   UUID NOT NULL,
 
     CONSTRAINT pk_user_company PRIMARY KEY (id),
+    CONSTRAINT uq_user_company_user UNIQUE (fk_users),
     CONSTRAINT fk_user_company_company FOREIGN KEY (fk_company)
         REFERENCES company (id),
     CONSTRAINT fk_user_company_users FOREIGN KEY (fk_users)
@@ -362,6 +371,10 @@ CREATE TABLE offer (
     unit_price        NUMERIC NOT NULL,
     availability      INTEGER NOT NULL,
     expiration_date   TIMESTAMPTZ,
+    slug              VARCHAR(160) NOT NULL UNIQUE,
+    discount_percentage NUMERIC,
+    source_locale     VARCHAR(10),
+    translation_status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
 
     CONSTRAINT pk_offer PRIMARY KEY (id),
     CONSTRAINT fk_offer_supplier FOREIGN KEY (fk_supplier)
@@ -519,6 +532,8 @@ CREATE TABLE energy_bill (
     fk_local_unit  UUID NOT NULL,
     consumption    NUMERIC NOT NULL,
     price          NUMERIC NOT NULL,
+    photo_url      VARCHAR(255),
+    photo_public_id VARCHAR(255),
 
     CONSTRAINT pk_energy_bill PRIMARY KEY (id),
     CONSTRAINT fk_energy_bill_local_unit FOREIGN KEY (fk_local_unit)
@@ -597,4 +612,56 @@ CREATE TABLE flux_log (
     CONSTRAINT pk_flux_log PRIMARY KEY (id),
     CONSTRAINT fk_flux_log_user FOREIGN KEY (fk_user)
         REFERENCES users (id)
+);
+
+-- Catalogo traduzido e fotos usadas pelas entidades atuais do api-core.
+CREATE TABLE offer_service_region (
+    fk_offer UUID NOT NULL REFERENCES offer(id),
+    region VARCHAR(120)
+);
+CREATE INDEX idx_offer_service_region_offer ON offer_service_region (fk_offer);
+
+CREATE TABLE offer_translation (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    fk_offer UUID NOT NULL REFERENCES offer(id),
+    locale VARCHAR(10) NOT NULL,
+    title VARCHAR(160) NOT NULL,
+    description TEXT NOT NULL,
+    details TEXT,
+    CONSTRAINT uq_offer_translation_locale UNIQUE (fk_offer, locale)
+);
+
+CREATE TABLE model_photo (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    fk_model UUID NOT NULL REFERENCES model(id),
+    url VARCHAR(255) NOT NULL,
+    public_id VARCHAR(255) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX idx_model_photo_model_created ON model_photo (fk_model, created_at DESC);
+
+CREATE TABLE company_photo (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    fk_company UUID NOT NULL REFERENCES company(id),
+    type VARCHAR(255) NOT NULL CHECK (type IN ('PROFILE', 'BANNER')),
+    url VARCHAR(255) NOT NULL,
+    public_id VARCHAR(255) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE user_photo (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    fk_user UUID NOT NULL REFERENCES users(id),
+    type VARCHAR(255) NOT NULL CHECK (type IN ('PROFILE', 'BANNER')),
+    url VARCHAR(255) NOT NULL,
+    public_id VARCHAR(255) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE local_unit_photo (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    fk_local_unit UUID NOT NULL REFERENCES local_unit(id),
+    url VARCHAR(255) NOT NULL,
+    public_id VARCHAR(255) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL
 );
