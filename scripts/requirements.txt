@@ -1,4 +1,4 @@
 psycopg2-binary>=2.9.10
 python-dotenv>=1.0.1
-Faker>=26.0.0
+Faker>=26.3.0
 pyarrow>=18.0.0
