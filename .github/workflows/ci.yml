@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test-password-for-ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply the schemas
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: test-password-for-ci
+        run: |
+          for target in core auth; do
+            psql --quiet --set ON_ERROR_STOP=1 --command "create database ${target}db"
+            for file in enums schema indexes seed; do
+              psql --quiet --set ON_ERROR_STOP=1 --dbname "${target}db" --file "db/${target}/${file}.sql"
+            done
+          done
