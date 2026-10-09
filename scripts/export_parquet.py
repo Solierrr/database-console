@@ -79,7 +79,6 @@ def read_environment(env_path: Path) -> tuple[dict[str, str], str]:
 
 def arrow_type(column: dict[str, object]) -> pa.DataType:
     data_type = str(column["data_type"]).lower()
-    udt_name = str(column["udt_name"]).lower()
     if data_type == "boolean":
         return pa.bool_()
     if data_type == "smallint":

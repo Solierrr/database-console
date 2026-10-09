@@ -1,4 +1,11 @@
-import csv, json, os, random, re, string, sys, uuid
+import csv
+import json
+import os
+import random
+import re
+import string
+import sys
+import uuid
 
 import psycopg2
 import psycopg2.extras
