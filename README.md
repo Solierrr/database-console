@@ -12,6 +12,10 @@
 
 Repositório responsável por guardar, documentar e facilitar o uso de scripts, planejamentos e mudanças nos bancos de dados do projeto. É utilizado `Makefile` para facilitar a execução de scripts `SQL`. Todas as declarações de Triggers, Procedures, Functions, Indexes, Metadados (como Enums), entre outros; são guardados aqui nesse repositório de maneira organizada e granularizada. Além de toda organização para `SQL`, também há a presença de `python` para a execução de dataloads massivos com uso de Faker e dados pré-definidos.
 
+## Banco de analytics
+
+Use `make create TARGET=analytics ENVIRONMENT=prod` para criar o banco PostgreSQL `analyticsdb` sem apagar um banco existente. Com `ENVIRONMENT=qa`, o nome segue a convenção do repositório e passa a ser `analyticsdbqa`. O comando usa `HOST`, `PORT`, `USER` e `PASSWORD` do `.env` local e exige permissão de criação de bancos. Para abrir uma sessão, use `make connect TARGET=analytics ENVIRONMENT=prod`. A criação do banco não dispara cargas ou pipelines do Databricks.
+
 <p>
   <a href="https://github.com/syvixor/skills-icons">
     <img src="https://skills.syvixor.com/api/icons?i=postgresql,mongodb,python" height="64">
