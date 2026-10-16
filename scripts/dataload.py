@@ -471,20 +471,24 @@ class Seeder:
 
     def seed_model(self):
         rows = []
+        brands = []
+        names = {}
         for _ in range(self.n(40)):
-            row_id = new_id()
-            rows.append((
-                row_id, trunc(FAKE.company(), 100), trunc(FAKE.bothify("Model-###??"), 100),
-                FAKE.pydecimal(left_digits=3, right_digits=2, positive=True),
-                FAKE.pydecimal(left_digits=2, right_digits=2, positive=True),
-                FAKE.pydecimal(left_digits=1, right_digits=2, positive=True),
-                FAKE.pydecimal(left_digits=2, right_digits=2, positive=True),
-                pick(["APPROVED", "APPROVED", "UNDER_ANALYSIS", "REJECTED"]),
-            ))
+            row_id, brand_id = new_id(), new_id()
+            name = trunc(FAKE.company(), 100)
+            normalized = re.sub(r"\s+", " ", name.strip()).lower()
+            if normalized in names:
+                brand_id = names[normalized]
+            else:
+                names[normalized] = brand_id
+                brands.append((brand_id, name, normalized, "PUBLIC"))
+            rows.append((row_id, brand_id, trunc(FAKE.bothify("Model-###??"), 100),
+                         random.randint(250, 650), random.randint(15, 25),
+                         "MONOCRYSTALLINE", 1.1, 2.1, random.randint(15, 30),
+                         pick(["APPROVED", "APPROVED", "UNDER_ANALYSIS", "REJECTED"])))
+        self.insert("brand", ["id", "name", "normalized_name", "visibility"], brands)
         self.ids.setdefault("model", []).extend(r[0] for r in rows)
-        self.insert("model", [
-            "id", "brand", "model", "power_wp", "efficiency", "dimension", "weight", "status",
-        ], rows)
+        self.insert("model", ["id", "fk_brand", "model", "power_wp", "efficiency", "type", "width", "length", "weight", "status"], rows)
 
     def seed_offer(self):
         rows = []
@@ -638,18 +642,21 @@ class Seeder:
         self.insert("energy_bill", ["id", "fk_local_unit", "consumption", "price"], rows)
 
     def seed_technical_project(self):
+        with self.conn.cursor() as cur:
+            cur.execute("SELECT u.id, u.fk_requester, r.fk_company FROM local_unit u JOIN requester r ON r.id = u.fk_requester")
+            locations = cur.fetchall()
         rows = []
         for _ in range(self.n(100)):
-            row_id = new_id()
+            if not locations:
+                break
+            unit_id, requester_id, company_id = pick(locations)
             start = FAKE.date_time_between("-1y", "now")
-            rows.append((
-                row_id, pick(self.ids["requester"]), pick(self.ids["local_unit"]),
-                pick(["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELED"]), start,
-                maybe([start + timedelta(days=random.randint(5, 90))], p=0.8),
-            ))
+            rows.append((new_id(), requester_id, unit_id,
+                         pick(["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELED"]), start,
+                         maybe([start + timedelta(days=random.randint(5, 90))], p=0.8), company_id))
         self.ids.setdefault("technical_project", []).extend(r[0] for r in rows)
         self.insert("technical_project", [
-            "id", "fk_requester", "fk_local_unit", "status", "start_date", "end_date",
+            "id", "fk_requester", "fk_local_unit", "status", "start_date", "end_date", "owner_company_id",
         ], rows)
 
     def seed_technical_service(self):
