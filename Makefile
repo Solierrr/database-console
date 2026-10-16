@@ -14,7 +14,7 @@ OUT ?= .env
 
 
 
-.PHONY: vault-config vault-auth extract-env tools-check env migrate schema seed dataload indexes enums reset reset-mongo connect backup export-parquet deps-windows install
+.PHONY: dev-up dev-db dev-down dev-status dev-seed vault-config vault-auth extract-env tools-check env migrate schema seed seed-plan dataload indexes enums reset reset-mongo connect backup export-parquet deps-windows install
 
 
 
@@ -44,13 +44,17 @@ MONGO_URI = $(call unquote,$(DB_MONGO_URI))/$(call unquote,$(DB_MONGO_MESSENGER)
 PSQL = psql "$(DATABASE_URI)" -f
 
 migrate:
-	$(PSQL) db/$(TARGET)/migrations/V1__create_$(TARGET)_schema.sql
+	python scripts/migrate.py --target $(TARGET) $(if $(BASELINE),--baseline $(BASELINE),)
 
 schema:
 	$(PSQL) db/$(TARGET)/schema.sql
 
 seed:
 	$(PSQL) db/$(TARGET)/seed.sql
+
+# Seed planejado (empresas, unidades, catalogo, tecnicos, propostas). Ex.: make seed-plan ARGS=--dry-run
+seed-plan:
+	python -m seed $(ARGS)
 
 indexes:
 	$(PSQL) db/$(TARGET)/indexes.sql
@@ -97,3 +101,21 @@ extract-env: vault-auth ## Generate a local environment file; prompts for missin
 tools-check: vault-config ## Alias for vault-config
 
 env: extract-env ## Alias for extract-env
+
+# Stack local de desenvolvimento (Postgres, Redis, api-auth, api-core + seed). Ver scripts/dev-stack.sh.
+dev-up:
+	sh scripts/dev-stack.sh up
+
+# So o banco: Postgres e Redis, migrations e seed, e mostra a string de conexao do coredb.
+dev-db:
+	sh scripts/dev-stack.sh db
+
+dev-down:
+	sh scripts/dev-stack.sh down
+
+dev-status:
+	sh scripts/dev-stack.sh status
+
+# Recarrega o seed; RESET=1 apaga antes o que o seed criou.
+dev-seed:
+	sh scripts/dev-stack.sh seed

@@ -1,0 +1,33 @@
+# Stack local de desenvolvimento: Postgres com coredb e authdb. Apenas para dev; credenciais abertas de proposito.
+services:
+  postgres:
+    image: postgres:16
+    container_name: local-database-console-postgres
+    environment:
+      POSTGRES_USER: solaria
+      POSTGRES_PASSWORD: solaria
+      POSTGRES_DB: coredb
+    ports:
+      - "${SOLARIA_PG_PORT:-55432}:5432"
+    volumes:
+      - solaria-pgdata:/var/lib/postgresql/data
+      - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/10-init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U solaria -d coredb"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7
+    container_name: local-database-console-redis
+    ports:
+      - "${SOLARIA_REDIS_PORT:-56379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  solaria-pgdata:
