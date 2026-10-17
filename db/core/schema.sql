@@ -31,6 +31,7 @@ CREATE TABLE address (
     zip_code      VARCHAR(8) NOT NULL,
     street        VARCHAR(255) NOT NULL,
     number        VARCHAR(10),
+    fk_owner_company UUID,
 
     CONSTRAINT pk_address PRIMARY KEY (id)
 );
@@ -61,7 +62,7 @@ CREATE TABLE contact (
 CREATE TABLE position (
     id        UUID NOT NULL DEFAULT gen_random_uuid(),
     name      VARCHAR(12) NOT NULL,
-    accesses  VARCHAR(255) NOT NULL,
+    accesses  VARCHAR(255),
 
     CONSTRAINT pk_position PRIMARY KEY (id),
     CONSTRAINT uq_position_name UNIQUE (name)
@@ -258,9 +259,9 @@ CREATE TABLE technician (
 -- "type" e o rotulo curto/categoria; "name"/"issuer" sao complementares.
 CREATE TABLE certification (
     id             UUID NOT NULL DEFAULT gen_random_uuid(),
-    fk_technician  UUID NOT NULL,
-    type           VARCHAR(255) NOT NULL,
-    information    TEXT NOT NULL,
+    fk_technician  UUID,
+    type           VARCHAR(255),
+    information    TEXT,
     image          TEXT,
     description    TEXT,
     issuer         VARCHAR(100),
@@ -590,8 +591,9 @@ CREATE TABLE technical_course (
 CREATE TABLE proposal (
     id            UUID NOT NULL DEFAULT gen_random_uuid(),
     fk_requester  UUID NOT NULL,
+    fk_supplier   UUID,
     status        proposal_status NOT NULL DEFAULT 'AWAITING_SUPPLIER',
-    notes         VARCHAR(255),
+    notes         VARCHAR(500),
     total_amount  NUMERIC,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ,
@@ -859,6 +861,7 @@ CREATE INDEX idx_professional_team_member_technician ON professional_team_member
 CREATE INDEX IF NOT EXISTS idx_user_company_company ON user_company (fk_company);
 CREATE INDEX IF NOT EXISTS idx_supplier_company ON supplier (fk_company);
 CREATE INDEX IF NOT EXISTS idx_requester_company ON requester (fk_company);
+CREATE INDEX IF NOT EXISTS idx_address_owner_company ON address (fk_owner_company);
 CREATE INDEX IF NOT EXISTS idx_offer_supplier ON offer (fk_supplier);
 CREATE INDEX IF NOT EXISTS idx_offer_model ON offer (fk_model);
 CREATE INDEX IF NOT EXISTS idx_subscription_supplier ON subscription (fk_supplier);
@@ -962,6 +965,9 @@ ALTER TABLE technician_affiliation ALTER COLUMN fk_company DROP NOT NULL;
 ALTER TABLE technician_affiliation ALTER COLUMN affiliation_type TYPE varchar(16) USING affiliation_type::text;
 ALTER TABLE technician_affiliation ADD CONSTRAINT ck_affiliation_type CHECK(affiliation_type IN ('INDEPENDENT','AFFILIATED','PARTNER'));
 ALTER TABLE technician_affiliation ADD CONSTRAINT ck_affiliation_company CHECK(fk_company IS NOT NULL OR affiliation_type='INDEPENDENT');
+ALTER TABLE proposal ADD CONSTRAINT fk_proposal_supplier FOREIGN KEY (fk_supplier) REFERENCES supplier (id);
+CREATE INDEX IF NOT EXISTS idx_proposal_supplier ON proposal (fk_supplier);
+ALTER TABLE address ADD CONSTRAINT fk_address_owner_company FOREIGN KEY (fk_owner_company) REFERENCES company (id) DEFERRABLE INITIALLY DEFERRED;
 CREATE UNIQUE INDEX uq_active_independent_affiliation ON technician_affiliation(fk_technician) WHERE active AND fk_company IS NULL AND affiliation_type='INDEPENDENT';
 
 -- Preserve the technical-service history in the agenda without fabricating missing end times.
