@@ -1,0 +1,201 @@
+# Plano do seed inicial (populacao planejada). Deterministico: o mesmo plano gera sempre os mesmos dados.
+# Imagens vem do manifest do mocks-warehouse (ver seed/README.md). Dados 100% ficticios.
+version: 1
+rng_seed: 20261011
+allowed_environments: [local, dev]
+
+auth:
+  email_domain: seed.solaria.dev
+  # bcrypt da senha de desenvolvimento descrita em seed/README.md (somente ambientes locais).
+  password_hash: "$2a$10$fvlbzLa7rYyx/Sp0OmHDM./cGfQsPi56iX214fIiJHyEoSq8uO28."
+
+cloudinary:
+  public_prefix: mocks
+
+cities:
+  - {key: sp, name: Sao Paulo, state: SP, lat: -23.5505, lon: -46.6333, zip: "01310"}
+  - {key: campinas, name: Campinas, state: SP, lat: -22.9099, lon: -47.0626, zip: "13010"}
+  - {key: bh, name: Belo Horizonte, state: MG, lat: -19.9167, lon: -43.9345, zip: "30130"}
+  - {key: curitiba, name: Curitiba, state: PR, lat: -25.4284, lon: -49.2733, zip: "80010"}
+  - {key: poa, name: Porto Alegre, state: RS, lat: -30.0346, lon: -51.2177, zip: "90010"}
+  - {key: salvador, name: Salvador, state: BA, lat: -12.9777, lon: -38.5016, zip: "40020"}
+  - {key: recife, name: Recife, state: PE, lat: -8.0476, lon: -34.8770, zip: "50010"}
+  - {key: fortaleza, name: Fortaleza, state: CE, lat: -3.7319, lon: -38.5267, zip: "60010"}
+  - {key: brasilia, name: Brasilia, state: DF, lat: -15.7939, lon: -47.8828, zip: "70040"}
+  - {key: goiania, name: Goiania, state: GO, lat: -16.6869, lon: -49.2648, zip: "74000"}
+
+streets: [Rua das Palmeiras, Avenida Central, Rua do Comercio, Avenida Brasil, Rua Sete de Setembro, Rua das Acacias, Avenida Paulista Norte, Rua XV de Novembro, Alameda dos Ipes, Rua da Liberdade, Avenida Getulio Vargas, Rua Bela Vista]
+
+# Empresas clientes (requester). Cada uma tem varias unidades; o ramo (segment) define as imagens das unidades.
+# banner_theme escolhe a pasta de banners de empresa; unidades distribuidas em round-robin entre as cidades.
+demandants:
+  - {key: aurora-hoteis, name: Rede Aurora Hoteis, segment: hotel, banner_theme: hospitality, units: 10, location_type: BUILDING, kwh: [42000, 78000], cities: [sp, campinas, bh, curitiba, poa, salvador, recife]}
+  - {key: grao-e-cia, name: Grao & Cia Cafeteria, segment: cafeteria, banner_theme: retail, units: 6, location_type: BUILDING, kwh: [4800, 9500], cities: [sp, campinas, curitiba]}
+  - {key: mercado-bom-preco, name: Mercado Bom Preco, segment: supermercado, banner_theme: retail, units: 5, location_type: BUILDING, kwh: [38000, 64000], cities: [bh, goiania, brasilia]}
+  - {key: hortifruti-quintal, name: Hortifruti Quintal, segment: hortifruti, banner_theme: retail, units: 3, location_type: BUILDING, kwh: [6500, 11000], cities: [recife, fortaleza]}
+  - {key: boi-prime, name: Casa de Carnes Boi Prime, segment: acougue, banner_theme: retail, units: 3, location_type: BUILDING, kwh: [7200, 13000], cities: [poa, curitiba]}
+  - {key: serra-azul, name: Frigorifico Serra Azul, segment: frigorifico, banner_theme: industrial, units: 3, location_type: COMPLEX, kwh: [95000, 160000], cities: [goiania, brasilia]}
+  - {key: pao-dourado, name: Padaria Pao Dourado, segment: padaria, banner_theme: retail, units: 4, location_type: BUILDING, kwh: [5200, 9800], cities: [sp, campinas]}
+  - {key: sabor-da-terra, name: Cantina Sabor da Terra, segment: restaurante, banner_theme: retail, units: 4, location_type: BUILDING, kwh: [6100, 12500], cities: [salvador, recife, fortaleza]}
+  - {key: vida-plena, name: Farmacia Vida Plena, segment: farmacia, banner_theme: retail, units: 5, location_type: BUILDING, kwh: [3800, 7400], cities: [sp, bh, curitiba, poa]}
+  - {key: casa-nova, name: Casa Nova Magazine, segment: varejo, banner_theme: retail, units: 4, location_type: BUILDING, kwh: [9500, 21000], cities: [sp, campinas, bh]}
+  - {key: nimbus-dc, name: Nimbus Data Centers, segment: data-center, banner_theme: corporate, units: 3, location_type: COMPLEX, kwh: [220000, 380000], cities: [sp, campinas, fortaleza]}
+  - {key: pixel-labs, name: Pixel Labs, segment: startup, banner_theme: corporate, units: 2, location_type: BUILDING, kwh: [2800, 5200], cities: [sp, bh]}
+  - {key: metalurgica-forte, name: Metalurgica Forte, segment: industria, banner_theme: industrial, units: 3, location_type: COMPLEX, kwh: [88000, 150000], cities: [curitiba, poa, campinas]}
+  - {key: movimento, name: Academia Movimento, segment: academia, banner_theme: retail, units: 4, location_type: BUILDING, kwh: [11000, 19500], cities: [sp, salvador, recife, brasilia]}
+  - {key: rota-116, name: Auto Posto Rota 116, segment: posto, banner_theme: retail, units: 5, location_type: COMPLEX, kwh: [7800, 14500], cities: [goiania, brasilia, bh]}
+
+# Fornecedores de paineis e infraestrutura. subscription: paid | expired (a expirada testa o filtro do recomendador).
+suppliers:
+  - {key: solmax, name: SolMax Distribuidora, business_type: DISTRIBUIDOR, city: sp, banner_theme: solar, subscription: paid, price_factor: 1.00}
+  - {key: energia-prime, name: EnergiaPrime Solar, business_type: DISTRIBUIDOR, city: campinas, banner_theme: solar, subscription: paid, price_factor: 0.94}
+  - {key: volt-fornecimentos, name: Volt Fornecimentos, business_type: ATACADISTA, city: curitiba, banner_theme: solar, subscription: paid, price_factor: 1.06}
+  - {key: brasil-solar, name: Brasil Solar Atacado, business_type: ATACADISTA, city: brasilia, banner_theme: solar, subscription: paid, price_factor: 0.90}
+  - {key: eco-telhados, name: Eco Telhados Energia, business_type: DISTRIBUIDOR, city: recife, banner_theme: solar, subscription: paid, price_factor: 1.12}
+  - {key: sunline, name: Sunline Distribuidora, business_type: DISTRIBUIDOR, city: salvador, banner_theme: solar, subscription: expired, price_factor: 0.97}
+
+# Empresas tecnicas (instaladoras). Os tecnicos se afiliam a elas.
+technical_companies:
+  - {key: raio-de-sol, name: Instalacoes Raio de Sol, city: sp, banner_theme: construction}
+  - {key: fotovolt, name: Engenharia Fotovolt, city: bh, banner_theme: construction}
+  - {key: alvo-telhados, name: Alvo Obras e Telhados, city: curitiba, banner_theme: construction}
+  - {key: conecta-eletrica, name: Conecta Eletrica, city: recife, banner_theme: construction}
+  - {key: projeta-solar, name: Projeta Solar, city: goiania, banner_theme: construction}
+
+platform_admins: 2
+
+# Contas fixas de desenvolvimento, uma por cargo e por tipo de empresa (e-mail: <usuario>@seed.solaria.dev).
+dev_accounts:
+  - company: aurora-hoteis        # demandante
+    accounts: [[dev_dem_admin, ADMIN], [dev_dem_manager, MANAGER], [dev_dem_support, SUPPORT]]
+  - company: solmax               # fornecedor (distribuidora)
+    accounts: [[dev_forn_admin, ADMIN], [dev_forn_manager, MANAGER], [dev_forn_sales, SALES]]
+  - company: raio-de-sol          # fornecedor (empresa tecnica)
+    accounts: [[dev_tec_admin, ADMIN], [dev_tec_manager, MANAGER], [dev_tec_support, SUPPORT], [dev_tec_technician, TECHNICIAN]]
+dev_platform_admin: dev_platform_admin
+
+# Mix de status para testar filtros de analise (os demais ficam APPROVED).
+company_status_overrides: {casa-nova: UNDER_ANALYSIS, rota-116: REJECTED}
+
+brands: [HelioTek, SunForge, Voltara, Aurelia Solar, Fotonix, Lumina Energia, Terrasol, Ecowatt, Solarix, Kaelo]
+infra_brands: [FixaSol, RailPro]
+
+panels:
+  models: 45
+  offers: 110
+  # tipo, faixas de potencia (Wp), eficiencia (%), area (m2), peso (kg) e quantidade de modelos
+  families:
+    - {type: MONOCRYSTALLINE, power: [400, 720], efficiency: [20.0, 23.2], area: [1.9, 3.1], weight: [21.0, 38.0], count: 26}
+    - {type: POLYCRYSTALLINE, power: [270, 400], efficiency: [16.0, 18.5], area: [1.6, 2.0], weight: [17.0, 24.0], count: 13}
+    - {type: THIN_FILM, power: [100, 250], efficiency: [11.0, 14.5], area: [1.2, 2.2], weight: [14.0, 22.0], count: 6}
+  price_per_wp: [2.2, 3.9]
+  # casos de borda: modelos nao aprovados, ofertas expiradas, pausadas e sem estoque
+  edge: {under_analysis_models: 3, rejected_models: 2, expired_offer_ratio: 0.10, paused_offer_ratio: 0.05, no_stock_ratio: 0.10}
+
+infrastructure:
+  offers_per_product: 2
+  products:
+    - {name: Trilho de aluminio 4,2 m, type: RAIL, material: Aluminio anodizado, brand: RailPro, price: 148.90}
+    - {name: Grampo intermediario 35 mm, type: CLAMP, material: Aluminio, brand: FixaSol, price: 6.40}
+    - {name: Grampo final 35 mm, type: CLAMP, material: Aluminio, brand: FixaSol, price: 7.10}
+    - {name: Suporte em L para estrutura, type: BRACKET, material: Aluminio, brand: RailPro, price: 12.90}
+    - {name: Gancho para telha ceramica, type: HOOK, material: Aco inox, brand: FixaSol, price: 18.50}
+    - {name: Kit de fixacao para telhado metalico, type: KIT, material: Aco galvanizado, brand: RailPro, price: 289.00}
+
+technicians:
+  count: 40
+  professions: {Instalador Solar: 12, Eletricista: 8, Engenheiro Eletricista: 6, Projetista: 4, Tecnico em Eletronica: 4, Gestor de Obras: 3, Soldador: 2, Encanador: 1}
+  expired_registration_ratio: 0.15
+  max_reviews: 40
+
+services:
+  count: 150
+  status_weights: {COMPLETED: 55, IN_PROGRESS: 15, OPEN: 15, CANCELED: 15}
+
+proposals:
+  count: 30
+  accepted_ratio: 0.6
+
+# Compras de demonstracao (pagamentos ficticios). O estoque da oferta e descontado so dos pedidos PAID.
+# Comprador: demandant (admin de uma empresa demandante) ou professional (profissional registrado). Fornecedor nunca compra.
+orders:
+  fee_percentage: 0.005
+  purchases:
+    - {buyer: demandant, status: PAID, method: PIX, suppliers: 1, items: 2, days: -12}
+    - {buyer: demandant, status: PAID, method: CREDIT_CARD, suppliers: 2, items: 3, days: -5}
+    - {buyer: professional, status: CANCELED, method: BOLETO, suppliers: 1, items: 1, days: -9}
+    - {buyer: professional, status: PAID, method: TRANSFER, suppliers: 2, items: 2, days: -2}
+  carts:
+    - {buyer: demandant, buyer_index: 3, suppliers: 2, items: 3}
+    - {buyer: professional, buyer_index: 5, suppliers: 1, items: 2}
+
+# Permissoes padrao por cargo (ADMIN passa por tudo e nao precisa de linhas). Nomes exatos do catalogo `permission`.
+# Menor privilegio: SUPPORT e TECHNICIAN leem; SALES cuida da parte comercial; MANAGER opera a empresa, mas nao governa
+# cargos/permissoes nem demite. A gestao de cargos e permissoes fica so com ADMIN.
+position_permissions:
+  SUPPORT:
+    - GET /api/offers/company/{companyId}
+    - GET /api/offers/{id}/history
+    - GET /api/models
+    - GET /api/models/status/{status}
+    - GET /api/local-units/company/{companyId}
+    - GET /api/requesters/company/{companyId}
+    - GET /api/suppliers/company/{companyId}
+    - GET /api/user-companies/company/{companyId}
+    - GET /api/access-codes/company/{companyId}
+    - GET /api/professional-teams/company/{companyId}
+    - GET /api/company-positions/company/{companyId}
+    - GET /api/users/{id}
+  TECHNICIAN:
+    - GET /api/models
+    - GET /api/models/status/{status}
+    - GET /api/professional-teams/company/{companyId}
+    - GET /api/users/{id}
+  SALES:
+    - POST /api/offers
+    - PUT /api/offers/{id}
+    - DELETE /api/offers/{id}
+    - PATCH /api/offers/{id}/status
+    - GET /api/offers/company/{companyId}
+    - GET /api/offers/{id}/history
+    - POST /api/models
+    - PUT /api/models/{id}
+    - GET /api/models
+    - GET /api/models/status/{status}
+    - GET /api/suppliers/company/{companyId}
+    - GET /api/users/{id}
+  MANAGER:
+    - POST /api/offers
+    - PUT /api/offers/{id}
+    - DELETE /api/offers/{id}
+    - PATCH /api/offers/{id}/status
+    - GET /api/offers/company/{companyId}
+    - GET /api/offers/{id}/history
+    - POST /api/models
+    - PUT /api/models/{id}
+    - DELETE /api/models/{id}
+    - GET /api/models
+    - GET /api/models/status/{status}
+    - POST /api/local-units
+    - PUT /api/local-units/{id}
+    - DELETE /api/local-units/{id}
+    - GET /api/local-units/company/{companyId}
+    - GET /api/requesters/company/{companyId}
+    - GET /api/suppliers/company/{companyId}
+    - POST /api/geolocalizations
+    - POST /api/access-codes
+    - GET /api/access-codes/company/{companyId}
+    - DELETE /api/access-codes/{id}/company/{companyId}
+    - GET /api/user-companies/company/{companyId}
+    - GET /api/company-positions/company/{companyId}
+    - POST /api/professional-teams
+    - PUT /api/professional-teams/{id}
+    - GET /api/professional-teams/company/{companyId}
+    - GET /api/users/{id}
+
+# Conta única local: pessoal/profissional, administração da plataforma e três empresas.
+dev_test_account:
+  username: teste
+  email: teste@teste
+  # bcrypt de Batata123; somente no seed local.
+  password_hash: "$2b$10$Ft7ZU5.3IJQCU/MbeqIA2.kpPXyj1S5I.xU8o/Rlg4BbFDghriA7G"

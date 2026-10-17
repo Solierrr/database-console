@@ -18,7 +18,29 @@ Repositório responsável por guardar, documentar e facilitar o uso de scripts, 
   </a>
 </p>
 
+## Consumir o coredb localmente
+
+`make dev-db` sobe só o Postgres e o Redis em Docker, aplica as migrações de `core` e `auth` (inclusive o carrinho e os pedidos, V27 e V28), carrega o seed planejado e imprime como conectar: `postgresql://solaria:solaria@localhost:55432/coredb` (porta ajustável por `SOLARIA_PG_PORT`). Serve para apontar uma API ou um cliente SQL para o banco sem subir `api-auth` e `api-core`. `make dev-up` faz o mesmo e ainda sobe as duas APIs; `make dev-status` mostra o que está de pé; `make dev-down` para tudo e mantém os dados no volume.
+
+Os containers se chamam `local-database-console-postgres` e `local-database-console-redis`. Quem já tinha os containers antigos (`solaria-postgres` e `solaria-redis`, parados) pode removê-los com `docker rm solaria-postgres solaria-redis`: os dados ficam no volume `solaria-pgdata`, que o compose continua usando.
+
+## Carrinho e pedidos
+
+As migrações `V27__marketplace_orders.sql` e `V28__purchase_permissions.sql` criam as tabelas `cart`, `cart_item`, `purchase_order`, `order_item` e `order_payment` e as permissões de compra no catálogo (`permission`). O pedido guarda uma cópia do preço, do desconto e do nome do modelo; o pagamento é fictício. Duas regras valem também no banco, por gatilho: usuário de empresa fornecedora só compra se for profissional registrado e aprovado, e ninguém compra de uma empresa fornecedora a que pertence. A spec está no VersioSpec (`marketplace/pagamentos`). Os testes são `tests/test_marketplace_migration.py`.
+
 ## Segredos e backup PostgreSQL
+
+### Migrations do core
+
+`make migrate TARGET=core` executa todas as migrations em ordem usando `scripts/migrate.py`, com as variáveis `DB_POSTGRES_*` já usadas pelo exportador. Cada migration e seu registro em `solaria_schema_history` são gravados na mesma transação. O runner confere checksums e serializa execuções concorrentes. Não alterar migrations já aplicadas.
+
+Para um banco existente sem histórico, primeiro conferir sua estrutura contra as versões e executar o diagnóstico `db/core/diagnostics.sql` depois da V12. Somente após confirmar o baseline, usar `make migrate TARGET=core BASELINE=11` se ele já corresponder às V1–V11. Baseline registra versões como já presentes; não executa nem verifica automaticamente seus SQLs. Bancos divergentes precisam ser reconciliados antes, sem descartar dados.
+
+Instalações novas devem preferir o runner desde a V1. `schema.sql` permanece como alternativa de instalação vazia, incluindo as estruturas novas; não executar sobre um banco já instalado nem executar V1 novamente após esse caminho. Os scripts antigos `api-core/src/main/resources/db/deeplink.sql` e `api-core/database/schema-user-connections.sql` foram substituídos por avisos: a fonte executável agora fica aqui. Seeds são apenas para desenvolvimento.
+
+As migrations V12–V18 cobrem validação/documentos privados, integridade de estoque/ofertas, fila de tradução, estados/histórico de ofertas, equipes, índices e permissões. Duplicidades e valores inválidos interrompem a migration; não há saneamento automático. Novas permissões entram no catálogo e precisam ser atribuídas aos cargos apropriados.
+
+Para testar em um PostgreSQL isolado, definir `SOLARIA_TEST_PG_DSN` e executar `python -m unittest discover -s tests -v`. Os testes usam schemas temporários próprios e removem somente esses schemas no encerramento.
 
 Extraia as credenciais do ambiente desejado com `make extract-env SERVICE=database-console ENV=qa`. Sem argumentos, `make extract-env` pergunta o serviço e o ambiente. O arquivo `.env` é local e ignorado pelo Git.
 
@@ -39,3 +61,10 @@ Para carregar dados no Databricks, use `make export-parquet TARGET=core` (ou `TA
 - [CONTRIBUTING.md](https://github.com/Solierrr/.github/blob/main/.github/CONTRIBUTING.md), convenções de commit, branch e Pull Request.
 - [CODE_OF_CONDUCT.md](https://github.com/Solierrr/.github/blob/main/.github/CODE_OF_CONDUCT.md), código de conduta do projeto.
 - [SECURITY.md](https://github.com/Solierrr/.github/blob/main/.github/SECURITY.md), como reportar vulnerabilidades de segurança.
+
+
+### Projetos privados (V24)
+
+V24 inclui propriedade empresarial/profissional, participação, convites, agenda, histórico e fotos privadas. Preserva empresa/local/executores dos projetos antigos e disponibiliza seus serviços na agenda, mantendo término desconhecido vazio. Status de projetos/serviços e tipo de afiliação ficam em varchar com constraints, alinhados ao JPA. Afiliação independente pode ter empresa nula; nenhuma relação de emprego é criada.
+
+Banco existente: aplicar V24 após V23. Banco novo: schema consolidado já inclui V24; baseline deve ser 24 antes de usar o executor. Testes específicos: `python -m unittest discover -s tests -p test_projects_migration.py -v` com SOLARIA_TEST_PG_DSN apontando para um PostgreSQL descartável.

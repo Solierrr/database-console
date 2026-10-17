@@ -89,3 +89,4 @@ exports/
 *.pgpass
 .my.cnf
 connections.local.*
+.dev/

@@ -46,10 +46,11 @@ INSERT INTO supplier (id, fk_company, status, business_type)
 VALUES ('88888888-8888-8888-8888-888888888888', '77777777-7777-7777-7777-777777777777', 'ACTIVE', 'DISTRIBUIDOR');
 
 -- Catalogo: um modelo de painel homologado e uma oferta do fornecedor demo.
-INSERT INTO model (id, brand, model, power_wp, efficiency, type, width, length, weight, status)
+INSERT INTO brand(id,name,normalized_name,visibility) VALUES ('bbbbbbbb-0000-0000-0000-000000000001','SolarTech','solartech','PUBLIC');
+INSERT INTO model (id, fk_brand, model, power_wp, efficiency, type, width, length, weight, status)
 VALUES (
     '99999999-9999-9999-9999-999999999999',
-    'SolarTech',
+    'bbbbbbbb-0000-0000-0000-000000000001',
     'ST-450W',
     450,
     21.5,
