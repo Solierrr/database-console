@@ -123,7 +123,7 @@ class Builder:
     def phone(self):
         return '11' + ''.join(str(self.rng.randint(0, 9)) for _ in range(9))
 
-    def address(self, city_key, label):
+    def address(self, city_key, label, owner_company_id=None):
         city = self.cities[city_key]
         address_id = uid('address', label)
         zip_code = city['zip'] + ''.join(str(self.rng.randint(0, 9)) for _ in range(3))
@@ -132,6 +132,7 @@ class Builder:
             'neighborhood': self.rng.choice(['Centro', 'Jardim America', 'Vila Nova', 'Boa Vista', 'Santa Cruz']),
             'zip_code': zip_code, 'street': self.rng.choice(self.plan['streets']),
             'number': str(self.rng.choice(SEGMENT_STREET_NUMBERS)),
+            'fk_owner_company': owner_company_id,
         })
         self.add('geolocalization', {
             'id': uid('geo', label), 'fk_address': address_id,
@@ -193,7 +194,7 @@ class Builder:
 
     def company(self, key, name, ctype, city_key, banner_theme, status='APPROVED'):
         company_id = uid('company', key)
-        address_id = self.address(city_key, f'company:{key}')
+        address_id = self.address(city_key, f'company:{key}', company_id)
         contact_id = uid('contact', key)
         self.add('business_contact', {
             'id': contact_id, 'company_email': f'contato@{key}.{self.domain}'[:100], 'phone': self.phone(),
@@ -271,7 +272,7 @@ class Builder:
         key, segment = entry['key'], entry['segment']
         city_key = entry['cities'][index % len(entry['cities'])]
         unit_id = uid('unit', key, index)
-        address_id = self.address(city_key, f'unit:{key}:{index}')
+        address_id = self.address(city_key, f'unit:{key}:{index}', uid('company', key))
         self.add('local_unit', {
             'id': unit_id, 'fk_requester': requester_id, 'fk_address': address_id,
             'complement': f'Unidade {index + 1} - {self.cities[city_key]["name"]}', 'location_type': entry['location_type'],
@@ -614,7 +615,7 @@ class Builder:
                 'id': uid('offer_translation', offer_id, locale), 'fk_offer': offer_id, 'locale': locale,
                 'title': loc_title[:160], 'description': loc_description, 'details': None,
             })
-        self.offers.append({'id': offer_id, 'supplier_key': supplier['key'], 'price': price, 'paused': paused,
+        self.offers.append({'id': offer_id, 'supplier_key': supplier['key'], 'supplier_id': supplier['supplier_id'], 'price': price, 'paused': paused,
                             'expired': expired, 'kind': 'panel' if not title.startswith('Infra') else 'infra'})
         return offer_id
 
@@ -722,7 +723,9 @@ class Builder:
             company_id = self.rng.choice(companies)
             info = self.units_by_company[company_id]
             proposal_id = uid('proposal', index)
-            items = self.rng.sample(sellable, self.rng.randint(1, 3))
+            supplier_id = self.rng.choice(sorted({o['supplier_id'] for o in sellable}))
+            pool = [o for o in sellable if o['supplier_id'] == supplier_id]
+            items = self.rng.sample(pool, min(len(pool), self.rng.randint(1, 3)))
             total = 0
             item_rows = []
             for item_index, offer in enumerate(items):
@@ -737,7 +740,7 @@ class Builder:
                     'negotiated_price': negotiated, 'discount': discount if negotiated else None,
                 })
             self.add('proposal', {
-                'id': proposal_id, 'fk_requester': info['requester'], 'status': status,
+                'id': proposal_id, 'fk_requester': info['requester'], 'fk_supplier': supplier_id, 'status': status,
                 'notes': 'Proposta gerada pelo seed planejado.', 'total_amount': round(total, 2),
                 'created_at': self.when(-self.rng.randint(3, 160)), 'updated_at': None,
             })
