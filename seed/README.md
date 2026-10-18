@@ -25,6 +25,10 @@ Opções: `--today AAAA-MM-DD` (data de referência das assinaturas, ofertas e s
 
 É idempotente: uma segunda execução não duplica nada (`ON CONFLICT DO NOTHING` em IDs derivados do plano). Datas relativas (assinaturas, validade das ofertas) são calculadas na primeira carga; use `--reset` e carregue de novo para renová-las.
 
+## Seed no QA
+
+O QA aceita o seed só com uma senha própria: defina `ENVIRONMENT=qa` e `SEED_PASSWORD_HASH` (bcrypt da senha do QA, guardada no Infisical, nunca no repositório). Nesse modo todos os usuários usam essa senha e a conta `dev_test_account` (senha fixa do repositório) não é criada. Sem `SEED_PASSWORD_HASH` o seed recusa rodar. Produção continua fora: o seed nunca roda lá.
+
 ## Login de desenvolvimento
 
 Todos os usuários criados usam a mesma senha, só válida localmente: `Seed-8fdPTytyex`. O e-mail de cada um é `<username>@seed.solaria.dev`. Para listar: `SELECT username FROM users` no `coredb`.

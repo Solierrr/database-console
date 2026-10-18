@@ -371,3 +371,27 @@ class SeedLoadTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+def test_qa_exige_hash_proprio_e_nao_cria_a_conta_de_teste(monkeypatch):
+    import pytest
+    from seed.loader import apply_environment_overrides
+
+    plan = {'allowed_environments': ['local', 'dev'], 'auth': {'password_hash': '$2a$10$publico'}, 'dev_test_account': {'username': 'teste'}}
+    monkeypatch.setenv('ENVIRONMENT', 'qa')
+    monkeypatch.delenv('SEED_PASSWORD_HASH', raising=False)
+    with pytest.raises(SystemExit):
+        apply_environment_overrides(dict(plan))
+    monkeypatch.setenv('SEED_PASSWORD_HASH', '$2b$10$hashproprio')
+    result = apply_environment_overrides({**plan, 'auth': dict(plan['auth'])})
+    assert 'qa' in result['allowed_environments']
+    assert result['auth']['password_hash'] == '$2b$10$hashproprio'
+    assert 'dev_test_account' not in result
+
+
+def test_local_nao_muda_o_plano(monkeypatch):
+    from seed.loader import apply_environment_overrides
+
+    monkeypatch.setenv('ENVIRONMENT', 'local')
+    plan = {'allowed_environments': ['local', 'dev'], 'auth': {'password_hash': '$2a$10$publico'}, 'dev_test_account': {}}
+    assert apply_environment_overrides(plan) == {'allowed_environments': ['local', 'dev'], 'auth': {'password_hash': '$2a$10$publico'}, 'dev_test_account': {}}

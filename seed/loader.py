@@ -16,7 +16,23 @@ PRIMARY_KEYS = {'local_credential': 'user_id'}
 
 
 def load_plan(path):
-    return yaml.safe_load(Path(path).read_text(encoding='utf-8'))
+    return apply_environment_overrides(yaml.safe_load(Path(path).read_text(encoding='utf-8')))
+
+
+def apply_environment_overrides(plan):
+    """No QA o seed so roda com uma senha propria (SEED_PASSWORD_HASH, bcrypt) e sem a conta de teste fixa.
+
+    A senha de desenvolvimento do plan.yaml e publica (esta no repositorio); por isso nunca vai para o QA.
+    """
+    if os.environ.get('ENVIRONMENT', '').lower() != 'qa':
+        return plan
+    password_hash = os.environ.get('SEED_PASSWORD_HASH', '')
+    if not password_hash.startswith(('$2a$', '$2b$', '$2y$')):
+        raise SystemExit('No QA defina SEED_PASSWORD_HASH com o bcrypt da senha das contas de teste do QA.')
+    plan['allowed_environments'] = [*plan.get('allowed_environments', []), 'qa']
+    plan['auth']['password_hash'] = password_hash
+    plan.pop('dev_test_account', None)
+    return plan
 
 
 def check_environment(plan):
