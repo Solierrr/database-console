@@ -31,11 +31,11 @@ O QA aceita o seed só com uma senha própria: defina `ENVIRONMENT=qa` e `SEED_P
 
 ## Login de desenvolvimento
 
-Todos os usuários criados usam a mesma senha, só válida localmente: `Seed-8fdPTytyex`. O e-mail de cada um é `<username>@seed.solaria.dev`. Para listar: `SELECT username FROM users` no `coredb`.
+Todos os usuários criados usam a mesma senha simples, `Batata123`, só para desenvolvimento e QA de teste. O e-mail de cada um é `<username>@solaria.dev`. Para listar: `SELECT username FROM users` no `coredb`.
 
 ### Contas fixas por cargo
 
-Além dos usuários com nomes sorteados, o seed cria contas fixas (e-mail `<usuario>@seed.solaria.dev`, mesma senha) em `dev_accounts` do `plan.yaml`:
+Além dos usuários com nomes sorteados, o seed cria contas fixas (e-mail `<usuario>@solaria.dev`, mesma senha) em `dev_accounts` do `plan.yaml`:
 
 | Usuário | Cargo | Empresa |
 |---|---|---|
@@ -84,3 +84,7 @@ Casos de borda para testar filtros: modelos em análise e reprovados, ofertas ex
 O bloco `orders` do `plan.yaml` cria pedidos e carrinhos de exemplo para as telas de compra (pagamentos fictícios, nenhum valor real): quatro pedidos (pagos e um cancelado, alguns com itens de dois fornecedores) e dois carrinhos. Cada pedido grava o preço, o desconto e o nome do modelo no momento da compra, a taxa de 0,5% (`fee_percentage`) paga pelo comprador e um pagamento (`PIX`, `CREDIT_CARD`, `BOLETO` ou `TRANSFER`, sem lógica). O estoque da oferta (`availability`) é descontado só dos pedidos pagos.
 
 Quem compra: o administrador de uma empresa demandante (`buyer: demandant`) ou um profissional registrado (`buyer: professional`). Usuário de empresa fornecedora não compra, a menos que seja profissional registrado e aprovado, e ninguém compra de uma empresa fornecedora a que pertence: o seed escolhe só ofertas de outros fornecedores. O sorteio dos pedidos usa um gerador próprio, então não desloca nenhum outro dado do seed.
+
+### Profissionais e login mobile
+
+Todo técnico aprovado do seed ganha também um perfil de onboarding aprovado (`professional_onboarding`, com `approved_version` 1). É o que o app mobile exige no login: o `api-auth` só libera profissional ativo, com cadastro completo e aprovado. Sem essa linha o login mobile responde `MOBILE_ACCOUNT_NOT_ALLOWED`. Para testar no celular, use qualquer usuário de `users/pfp/professionals`, por exemplo uma conta `<username>@solaria.dev` de um técnico aprovado.

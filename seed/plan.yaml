@@ -5,9 +5,9 @@ rng_seed: 20261011
 allowed_environments: [local, dev]
 
 auth:
-  email_domain: seed.solaria.dev
-  # bcrypt da senha de desenvolvimento descrita em seed/README.md (somente ambientes locais).
-  password_hash: "$2a$10$fvlbzLa7rYyx/Sp0OmHDM./cGfQsPi56iX214fIiJHyEoSq8uO28."
+  email_domain: solaria.dev
+  # bcrypt de Batata123, a senha simples do seed (ambientes de desenvolvimento e QA de teste; ver seed/README.md).
+  password_hash: "$2b$10$Ft7ZU5.3IJQCU/MbeqIA2.kpPXyj1S5I.xU8o/Rlg4BbFDghriA7G"
 
 cloudinary:
   public_prefix: mocks
@@ -64,7 +64,7 @@ technical_companies:
 
 platform_admins: 2
 
-# Contas fixas de desenvolvimento, uma por cargo e por tipo de empresa (e-mail: <usuario>@seed.solaria.dev).
+# Contas fixas de desenvolvimento, uma por cargo e por tipo de empresa (e-mail: <usuario>@solaria.dev).
 dev_accounts:
   - company: aurora-hoteis        # demandante
     accounts: [[dev_dem_admin, ADMIN], [dev_dem_manager, MANAGER], [dev_dem_support, SUPPORT]]
