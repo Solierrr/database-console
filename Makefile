@@ -97,7 +97,7 @@ POWERSHELL ?= powershell
 else
 POWERSHELL ?= pwsh
 endif
-.PHONY: dev-up dev-db dev-down dev-status dev-seed migrate schema seed seed-plan dataload indexes enums reset reset-mongo connect backup export-parquet install-tools
+.PHONY: dev-up dev-db dev-down dev-status dev-seed migrate schema seed seed-plan dataload indexes enums reset reset-mongo connect backup export-parquet roles-apply roles-check install-tools
 
 
 
@@ -171,6 +171,12 @@ backup: ## Back up the PostgreSQL databases (TARGET=core|auth|all)
 
 export-parquet: ## Export the tables to Parquet for Databricks (TARGET=core|auth|all)
 	python scripts/export_parquet.py --target "$(if $(filter command line,$(origin TARGET)),$(TARGET),)"
+
+roles-apply: ## Create or refresh the read-only roles of the coredb consumers (ONLY=consumer)
+	$(PY) scripts/roles.py apply $(if $(ONLY),--only $(ONLY),)
+
+roles-check: ## Check the database against the read-only role contract (ONLY=consumer)
+	$(PY) scripts/roles.py check $(if $(ONLY),--only $(ONLY),)
 
 install-tools: ## Install PostgreSQL, Python and mongosh with winget (Windows)
 	winget install --id PostgreSQL.PostgreSQL.16 -e

@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "database": "coredb",
+  "comment": "Contrato de leitura do coredb por consumidor. Tabelas com \"*\" liberam todas as colunas; uma lista libera só aquelas colunas. Nada além de SELECT é concedido. Quem adiciona uma tabela ou coluna ao seu SQL atualiza este arquivo e roda `python scripts/roles.py apply`.",
+  "consumers": {
+    "api-recommendation": {
+      "role": "solaria_ro_recommendation",
+      "description": "Feeds de recomendação (ofertas, profissionais e fornecedores) pelo fallback SQL e pelo grafo.",
+      "tables": {
+        "brand": "*",
+        "certification": "*",
+        "company": "*",
+        "inventory": "*",
+        "model": "*",
+        "offer": "*",
+        "person": ["id", "fk_users"],
+        "profession": "*",
+        "professional_registration": "*",
+        "professional_review": "*",
+        "proposal": "*",
+        "proposal_item": "*",
+        "service_executor": "*",
+        "subscription": "*",
+        "supplier": "*",
+        "technical_service": "*",
+        "technician": "*",
+        "technician_affiliation": "*",
+        "users": ["id", "active"]
+      }
+    },
+    "database-bootstrap": {
+      "role": "solaria_ro_bootstrap",
+      "description": "Job que extrai o coredb e monta o grafo Neo4j.",
+      "tables": {
+        "brand": "*",
+        "certification": "*",
+        "company": "*",
+        "geolocalization": "*",
+        "inventory": "*",
+        "local_unit": "*",
+        "model": "*",
+        "offer": "*",
+        "person": ["id", "fk_users"],
+        "profession": "*",
+        "professional_registration": "*",
+        "professional_review": "*",
+        "proposal": "*",
+        "proposal_item": "*",
+        "service_executor": "*",
+        "shift": "*",
+        "subscription": "*",
+        "supplier": "*",
+        "technical_project": "*",
+        "technical_service": "*",
+        "technician": "*",
+        "technician_affiliation": "*",
+        "users": ["id", "active"]
+      }
+    },
+    "mcp-database": {
+      "role": "solaria_ro_mcp",
+      "description": "Ferramentas MCP que o assistente consulta direto (técnicos, profissões e itens de fixação).",
+      "tables": {
+        "address": "*",
+        "brand": "*",
+        "company": "*",
+        "model": "*",
+        "offer": "*",
+        "person": ["id", "name"],
+        "profession": "*",
+        "professional_registration": "*",
+        "supplier": "*",
+        "technician": "*",
+        "technician_affiliation": "*"
+      }
+    },
+    "databricks-sync": {
+      "role": "solaria_ro_databricks",
+      "description": "Replicação para o Databricks. Proposta: todas as tabelas, menos as de dado pessoal sensível ou segredo, e sem as colunas de contato e documento. Só vale depois do dono confirmar o que o pipeline precisa (T-046 e T-033).",
+      "all_tables": true,
+      "exclude_tables": [
+        "access_code",
+        "order_payment",
+        "professional_document",
+        "professional_onboarding",
+        "professional_submission",
+        "solaria_schema_history"
+      ],
+      "exclude_columns": {
+        "person": ["cpf", "birth_date"],
+        "contact": ["email", "phone"],
+        "business_contact": ["phone"],
+        "energy_bill": ["photo_url", "photo_public_id"]
+      }
+    }
+  }
+}
