@@ -42,7 +42,7 @@ As migrations V12–V18 cobrem validação/documentos privados, integridade de e
 
 Para testar em um PostgreSQL isolado, definir `SOLARIA_TEST_PG_DSN` e executar `python -m unittest discover -s tests -v`. Os testes usam schemas temporários próprios e removem somente esses schemas no encerramento.
 
-Extraia as credenciais do ambiente desejado com `make extract-env SERVICE=database-console ENV=qa`. Sem argumentos, `make extract-env` pergunta o serviço e o ambiente. O arquivo `.env` é local e ignorado pelo Git.
+Extraia as credenciais do ambiente desejado com `make vault ENV=qa` (`local`, `qa` ou `prod`; o padrão é `local`). Ele grava o `.env` a partir do Infisical (pasta `/database`) e exige o Infisical CLI com `infisical login`. O arquivo `.env` é local e ignorado pelo Git. `make help` lista os demais comandos.
 
 `make backup` pergunta qual banco PostgreSQL salvar: `core`, `auth` ou ambos. Para executar sem menu, use `make backup TARGET=core`, `make backup TARGET=auth` ou `make backup TARGET=all`. O comando usa `DB_POSTGRES_*` do `.env` e grava arquivos SQL com data e hora em `backups/<ambiente>/`, diretório ignorado pelo Git. Para mudar o ambiente do backup, extraia primeiro o `.env` correspondente. O banco MongoDB de `messenger` não é incluído em `pg_dump`.
 

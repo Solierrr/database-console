@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 if (-not (Test-Path -LiteralPath $EnvPath -PathType Leaf)) {
-    throw "Arquivo '$EnvPath' não encontrado. Execute 'make extract-env SERVICE=database-console ENV=qa'."
+    throw "Arquivo '$EnvPath' não encontrado. Execute 'make vault ENV=qa'."
 }
 
 $config = @{}
