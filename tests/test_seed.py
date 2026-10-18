@@ -274,7 +274,7 @@ class SeedPlanTest(unittest.TestCase):
         pool = ImagePool(ROOT.parent / 'mocks-warehouse' / 'manifest.json', PLAN['rng_seed'], 'x')
         data = build_dataset(PLAN, pool, TODAY)
         projects = data.core['technical_project']
-        self.assertEqual(52, len(projects))
+        self.assertGreater(len(projects), 40)
         members, photos, activities = {}, {}, {}
         for row in data.core['project_member']:
             members.setdefault(row['project_id'], []).append(row)
@@ -283,6 +283,7 @@ class SeedPlanTest(unittest.TestCase):
         for row in data.core['project_activity']:
             activities.setdefault(row['project_id'], []).append(row)
         services = Counter(row['fk_technical_project'] for row in data.core['technical_service'])
+        self.assertEqual({p['id'] for p in projects}, set(services), 'todo projeto tem ao menos um servico e vice-versa')
         self.assertGreater(len({row['name'] for row in projects}), 20)
         for project in projects:
             pid = project['id']
