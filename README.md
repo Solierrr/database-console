@@ -48,6 +48,7 @@ Extraia as credenciais do ambiente desejado com `make vault ENV=qa` (`local`, `q
 
 Os dumps podem conter dados sensíveis. Mantenha os arquivos fora do Git e compartilhe apenas por um canal aprovado pela equipe.
 
+<<<<<<< HEAD
 ## Acesso de leitura ao coredb por consumidor
 
 Quem lê o `coredb` direto (fora o `api-core`) usa um usuário somente leitura, um por consumidor, com o menor privilégio possível. O contrato de cada um (tabelas e colunas que ele lê) está em [`db/roles/contracts.json`](db/roles/contracts.json) e é aplicado por [`scripts/roles.py`](scripts/roles.py): `api-recommendation`, `database-bootstrap`, `mcp-database` e `databricks-sync` (este último é uma proposta que depende de confirmar o que o pipeline precisa). O `database-rpa` não tem papel: a decisão é aposentá-lo (ver a spec de acesso ao `coredb` no VersioSpec).
@@ -60,6 +61,12 @@ python scripts/roles.py login api-recommendation svc_recommendation SENHA_RECOME
 ```
 
 Os papéis não herdam tabelas novas: depois de uma migration que cria tabela ou coluna que um consumidor passa a ler, atualize o contrato e rode `make roles-apply` (o `roles-check` acusa a diferença). Em QA e produção quem cria os logins e guarda as senhas no Infisical é o dono; o script nunca imprime nem grava senha.
+=======
+## De quem é o schema
+
+- **`coredb`:** a fonte única é este repositório (`db/core/schema.sql` para instalação vazia e `db/core/migrations` para evoluir). O `api-core` não tem migrações próprias e roda com `ddl-auto=validate`, só conferindo o banco contra as entidades. Não existem outras cópias do DDL: o `schema-user-connections.sql` do `api-core` e o `schema_negocio.sql` do `mcp-database` foram removidos.
+- **`authdb`:** o autor das migrations é o `api-auth` (`src/main/resources/db/migration`, Flyway). Os arquivos de `db/auth/migrations` daqui são um **espelho** dos dele: nos ambientes quem os executa é `scripts/migrate.py --target auth`, com o Flyway do `api-auth` desligado (`SPRING_FLYWAY_ENABLED=false`); ligar os dois no mesmo banco faria o Flyway tentar recriar o que o `migrate.py` já criou. Uma migration nova nasce no `api-auth` e é copiada para cá; `make auth-mirror-check` (`API_AUTH_DIR` aponta para o clone do `api-auth`, padrão `../api-auth`) acusa arquivo que falta, que sobra ou que difere, ignorando só os comentários do começo.
+>>>>>>> df737d6 (feat: check that the authdb migrations mirror the api-auth ones)
 
 Para carregar dados no Databricks, use `make export-parquet TARGET=core` (ou `TARGET=auth` / `TARGET=all`). Sem `TARGET`, o comando pergunta qual banco exportar. Instale as dependências com `python -m pip install -r scripts/requirements.txt`. O exportador transmite as tabelas em lotes e cria uma pasta Parquet por tabela, com compressão Snappy, além de um `manifest.json`, em `exports/<ambiente>/<banco>/<data-hora-UTC>/`. Copie essa pasta para o armazenamento acessível ao Databricks; cada tabela pode ser lida separadamente, por exemplo `spark.read.parquet("<caminho>/public__company")`. Tipos UUID e enums viram texto; JSON e arrays viram texto JSON; números, datas, timestamps, booleanos e binários mantêm tipos Parquet compatíveis.
 
