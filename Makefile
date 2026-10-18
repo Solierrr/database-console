@@ -172,16 +172,14 @@ backup: ## Back up the PostgreSQL databases (TARGET=core|auth|all)
 export-parquet: ## Export the tables to Parquet for Databricks (TARGET=core|auth|all)
 	python scripts/export_parquet.py --target "$(if $(filter command line,$(origin TARGET)),$(TARGET),)"
 
-<<<<<<< HEAD
 roles-apply: ## Create or refresh the read-only roles of the coredb consumers (ONLY=consumer)
 	$(PY) scripts/roles.py apply $(if $(ONLY),--only $(ONLY),)
 
 roles-check: ## Check the database against the read-only role contract (ONLY=consumer)
 	$(PY) scripts/roles.py check $(if $(ONLY),--only $(ONLY),)
-=======
+
 auth-mirror-check: ## Check that db/auth/migrations mirrors the api-auth Flyway migrations (API_AUTH_DIR)
 	$(PY) scripts/check_auth_mirror.py $(API_AUTH_DIR)
->>>>>>> df737d6 (feat: check that the authdb migrations mirror the api-auth ones)
 
 install-tools: ## Install PostgreSQL, Python and mongosh with winget (Windows)
 	winget install --id PostgreSQL.PostgreSQL.16 -e
