@@ -97,7 +97,7 @@ POWERSHELL ?= powershell
 else
 POWERSHELL ?= pwsh
 endif
-.PHONY: dev-up dev-db dev-down dev-status dev-seed migrate schema seed seed-plan dataload indexes enums reset reset-mongo connect backup export-parquet roles-apply roles-check install-tools
+.PHONY: dev-up dev-db dev-down dev-status dev-seed migrate schema seed seed-plan dataload indexes enums reset reset-mongo connect backup export-parquet roles-apply roles-check auth-mirror-check install-tools
 
 
 
