@@ -97,7 +97,7 @@ POWERSHELL ?= powershell
 else
 POWERSHELL ?= pwsh
 endif
-.PHONY: dev-up dev-db dev-down dev-status dev-seed migrate schema seed seed-plan dataload indexes enums reset reset-mongo connect backup export-parquet roles-apply roles-check install-tools
+.PHONY: dev-up dev-db dev-down dev-status dev-seed migrate schema seed seed-plan dataload indexes enums reset reset-mongo connect backup export-parquet roles-apply roles-check auth-mirror-check install-tools
 
 
 
@@ -177,6 +177,9 @@ roles-apply: ## Create or refresh the read-only roles of the coredb consumers (O
 
 roles-check: ## Check the database against the read-only role contract (ONLY=consumer)
 	$(PY) scripts/roles.py check $(if $(ONLY),--only $(ONLY),)
+
+auth-mirror-check: ## Check that db/auth/migrations mirrors the api-auth Flyway migrations (API_AUTH_DIR)
+	$(PY) scripts/check_auth_mirror.py $(API_AUTH_DIR)
 
 install-tools: ## Install PostgreSQL, Python and mongosh with winget (Windows)
 	winget install --id PostgreSQL.PostgreSQL.16 -e
