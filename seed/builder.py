@@ -1,4 +1,5 @@
 import csv
+import json
 import random
 import re
 import unicodedata
@@ -17,7 +18,7 @@ CORE_TABLES = [
     'company_positions', 'position_permission', 'user_company', 'requester', 'supplier', 'technical_company', 'subscription',
     'brand', 'model', 'offer', 'offer_translation', 'inventory', 'local_unit', 'unit_specifications',
     'proposal', 'proposal_item', 'proposal_unit', 'cart', 'cart_item', 'purchase_order', 'order_item', 'order_payment',
-    'professional_registration', 'certification',
+    'professional_registration', 'professional_onboarding', 'certification',
     'certification_record', 'technician_affiliation', 'technical_project', 'technical_service',
     'service_executor', 'project_member', 'project_activity', 'project_history', 'project_photo', 'professional_review', 'user_photo', 'company_photo', 'local_unit_photo',
     'model_photo', 'platform_admin',
@@ -384,6 +385,24 @@ class Builder:
                 'active': True, 'joined_at': self.when(-20),
             })
 
+    def approved_onboarding(self, user_id, technician_id, council, number, expiration):
+        """Perfil de onboarding aprovado: é o que o login mobile exige de um profissional (api-core, `eligibility`).
+        Não sorteia nada, então os demais dados do seed não mudam. `professionId` fica nulo porque a profissão só é
+        resolvida (por nome) na hora de gravar; a profissão do técnico está em `professional_registration`."""
+        person = next(row for row in reversed(self.data.core['person']) if row['fk_users'] == user_id)
+        user = next(row for row in reversed(self.data.core['users']) if row['id'] == user_id)
+        draft = json.dumps({
+            'revision': 1, 'name': person['name'], 'cpf': person['cpf'], 'birthDate': person['birth_date'].isoformat(),
+            'email': f"{user['username']}@{self.domain}", 'phone': None, 'professionId': None,
+            'council': council, 'registrationNumber': number,
+            'registrationExpiration': expiration.date().isoformat(), 'documentIds': [],
+        }, default=str)
+        self.add('professional_onboarding', {
+            'id': uid('professional_onboarding', technician_id), 'auth_id': user['auth_id'], 'user_id': user_id,
+            'technician_id': technician_id, 'revision': 1, 'approved_version': 1,
+            'draft_json': draft, 'approved_json': draft, 'suspended': False,
+        })
+
     def dev_technician(self, company_key, company_id, username):
         user_id, person_id, name = self.user(f'dev:{username}', 'users/pfp/professionals', company_id, 'TECHNICIAN', username=username)
         technician_id = uid('technician', 'dev', username)
@@ -396,6 +415,7 @@ class Builder:
             'id': registration_id, 'fk_technician': technician_id, 'fk_profession': Ref('profession', profession),
             'council': 'CREA-SP', 'number': '100001', 'expiration_date': self.when(720).replace(tzinfo=None),
         })
+        self.approved_onboarding(user_id, technician_id, 'CREA-SP', '100001', self.when(720))
         self.add('technician_affiliation', {
             'id': uid('affiliation', 'dev', username), 'fk_company': company_id, 'fk_technician': technician_id,
             'affiliation_type': 'AFFILIATED', 'active': True,
@@ -690,6 +710,8 @@ class Builder:
                 'council': council, 'number': number,
                 'expiration_date': (self.when(-self.rng.randint(10, 300)) if expired else self.when(self.rng.randint(90, 900))).replace(tzinfo=None),
             })
+            if statuses[index] == 'APPROVED':
+                self.approved_onboarding(user_id, technician_id, council, number, self.when(720))
             for cert_index in range(self.rng.choice([0, 1, 1, 2, 3])):
                 cert_id = uid('certification', index, cert_index)
                 cert_name = self.rng.choice(cert_names)

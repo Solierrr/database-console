@@ -251,8 +251,28 @@ class SeedPlanTest(unittest.TestCase):
         self.assertEqual({'ADMIN', 'MANAGER', 'SALES', 'SUPPORT', 'TECHNICIAN'}, set(expected.values()))
         self.assertIn(usernames[PLAN['dev_platform_admin']], {row['fk_user'] for row in data.core['platform_admin']})
         emails = {row['primary_email'] for row in data.auth['auth_user']}
-        self.assertTrue(all(f'{name}@seed.solaria.dev' in emails for name in expected))
+        self.assertTrue(all(f'{name}@solaria.dev' in emails for name in expected))
         self.assertEqual(len(usernames), len(data.core['users']))
+
+    def test_approved_technicians_have_an_approved_onboarding_profile(self):
+        approved = {row['id']: row for row in self.data.core['technician'] if row['status'] == 'APPROVED'}
+        profiles = {row['technician_id']: row for row in self.data.core['professional_onboarding']}
+        self.assertEqual(set(approved), set(profiles))
+        users = {row['id']: row for row in self.data.core['users']}
+        persons = {row['id']: row for row in self.data.core['person']}
+        for technician_id, profile in profiles.items():
+            self.assertEqual(1, profile['approved_version'])
+            self.assertFalse(profile['suspended'])
+            self.assertIsNotNone(profile['approved_json'])
+            self.assertEqual(profile['auth_id'], users[profile['user_id']]['auth_id'])
+            self.assertEqual(persons[approved[technician_id]['fk_person']]['fk_users'], profile['user_id'])
+        self.assertEqual(len(profiles), len({row['auth_id'] for row in profiles.values()}))
+
+    def test_seed_accounts_use_the_simple_domain_and_password(self):
+        emails = {row['primary_email'] for row in self.data.auth['auth_user']}
+        self.assertTrue(all(email.endswith('@solaria.dev') for email in emails if not email.startswith('teste@')))
+        hashes = {row['password_hash'] for row in self.data.auth['local_credential']}
+        self.assertEqual({PLAN['auth']['password_hash'], PLAN['dev_test_account']['password_hash']}, hashes)
 
     def test_default_position_permissions_use_catalog_names_and_skip_admin(self):
         migrations = ' '.join(path.read_text(encoding='utf-8') for path in (ROOT / 'db' / 'core' / 'migrations').glob('V*.sql'))
