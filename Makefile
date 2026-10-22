@@ -14,7 +14,7 @@ OUT ?= .env
 
 
 
-.PHONY: vault-config vault-auth extract-env tools-check env migrate schema seed dataload indexes enums reset reset-mongo connect backup export-parquet deps-windows install
+.PHONY: vault-config vault-auth extract-env tools-check env create migrate schema seed dataload indexes enums reset reset-mongo connect backup export-parquet deps-windows install
 
 
 
@@ -42,6 +42,9 @@ MONGO_URI = $(call unquote,$(DB_MONGO_URI))/$(call unquote,$(DB_MONGO_MESSENGER)
 ### - make {command} TARGET={database} ENVIRONMENT={environment}
 
 PSQL = psql "$(DATABASE_URI)" -f
+
+create:
+	psql "$(MAINT_URI)" -v ON_ERROR_STOP=1 -v DB=$(DB_NAME) -f db/create.sql
 
 migrate:
 	$(PSQL) db/$(TARGET)/migrations/V1__create_$(TARGET)_schema.sql
