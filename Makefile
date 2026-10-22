@@ -131,6 +131,11 @@ MONGO_URI = $(call unquote,$(DB_MONGO_URI))/$(call unquote,$(DB_MONGO_MESSENGER)
 
 PSQL = psql "$(DATABASE_URI)" -f
 
+create:
+	psql "$(MAINT_URI)" -v ON_ERROR_STOP=1 -v DB=$(DB_NAME) -f db/create.sql
+
+migrate:
+	$(PSQL) db/$(TARGET)/migrations/V1__create_$(TARGET)_schema.sql
 migrate: ## Run the migrations of TARGET (core or auth)
 	python scripts/migrate.py --target $(TARGET) $(if $(BASELINE),--baseline $(BASELINE),)
 
