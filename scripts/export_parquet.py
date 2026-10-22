@@ -49,7 +49,7 @@ def choose_target(target: str | None) -> list[str]:
 def read_environment(env_path: Path) -> tuple[dict[str, str], str]:
     if not env_path.is_file():
         raise FileNotFoundError(
-            f"Arquivo {env_path} não encontrado. Execute make extract-env ENV=prod primeiro."
+            f"Arquivo {env_path} não encontrado. Execute make vault ENV=prod primeiro."
         )
 
     values = {
@@ -62,7 +62,7 @@ def read_environment(env_path: Path) -> tuple[dict[str, str], str]:
     if not match:
         raise ValueError(
             f"Não consegui identificar o ambiente no cabeçalho de {env_path}. "
-            "Extraia o .env novamente com make extract-env ENV=prod."
+            "Extraia o .env novamente com make vault ENV=prod."
         )
 
     required = (
