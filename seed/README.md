@@ -31,6 +31,12 @@ O QA aceita o seed só com uma senha própria: defina `ENVIRONMENT=qa` e `SEED_P
 
 ## Login de desenvolvimento
 
+### Conta de teste em QA e produção
+
+`test@test.dev` / `Batata123` pode ser criada ou atualizada nos dois ambientes com uma carga específica. Extraia as credenciais do ambiente desejado com `make vault ENV=qa` ou `make vault ENV=prod` e execute `python -m seed.test_account`. Para usar outro arquivo de credenciais, passe `--env-file CAMINHO`.
+
+Esse comando grava apenas a identidade em `auth_user`, a senha bcrypt em `local_credential` e o usuário vinculado em `users`. A repetição atualiza a senha e reativa a mesma conta, sem duplicá-la. A conta não recebe cargos de empresa nem administração da plataforma. A carga completa de dados fictícios continua com as restrições de ambiente descritas acima. Auth e core usam transações separadas; em caso de falha entre os commits, execute o comando novamente para reconciliar a conta.
+
 Todos os usuários criados usam a mesma senha simples, `Batata123`, só para desenvolvimento e QA de teste. O e-mail de cada um é `<username>@solaria.dev`. Para listar: `SELECT username FROM users` no `coredb`.
 
 ### Contas fixas por cargo
