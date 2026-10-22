@@ -643,21 +643,40 @@ class Seeder:
 
     def seed_technical_project(self):
         with self.conn.cursor() as cur:
-            cur.execute("SELECT u.id, u.fk_requester, r.fk_company FROM local_unit u JOIN requester r ON r.id = u.fk_requester")
+            cur.execute("""SELECT u.id, u.fk_requester, r.fk_company,
+                a.state, left(a.city,120), left(a.neighborhood,120), a.zip_code,
+                left(a.street,180), a.number, left(u.complement,180)
+                FROM local_unit u JOIN requester r ON r.id=u.fk_requester
+                LEFT JOIN address a ON a.id=u.fk_address""")
             locations = cur.fetchall()
         rows = []
-        for _ in range(self.n(100)):
+        for index in range(self.n(100)):
             if not locations:
                 break
-            unit_id, requester_id, company_id = pick(locations)
+            unit_id, requester_id, company_id, *address = pick(locations)
             start = FAKE.date_time_between("-1y", "now")
             rows.append((new_id(), requester_id, unit_id,
                          pick(["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELED"]), start,
-                         maybe([start + timedelta(days=random.randint(5, 90))], p=0.8), company_id))
+                         maybe([start + timedelta(days=5 + index % 86)], p=0.8), company_id, *address))
         self.ids.setdefault("technical_project", []).extend(r[0] for r in rows)
         self.insert("technical_project", [
             "id", "fk_requester", "fk_local_unit", "status", "start_date", "end_date", "owner_company_id",
+            "location_state", "location_city", "location_neighborhood", "location_zip_code",
+            "location_street", "location_number", "location_complement",
         ], rows)
+
+    def seed_connections(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                SELECT u.id FROM users u WHERE u.active AND u.id=ANY(%s::uuid[]) AND u.managed_by_company_id IS NULL
+                AND cardinality(u.connections)=0
+                AND EXISTS(SELECT 1 FROM person p WHERE p.fk_users=u.id)
+                ORDER BY u.id LIMIT 3
+            """, (self.ids.get("users", []),))
+            users = [row[0] for row in cur.fetchall()]
+            if len(users) >= 2:
+                cur.execute("UPDATE users SET connections=ARRAY[%s]::uuid[] WHERE id=%s AND cardinality(connections)=0",
+                            (users[1], users[0]))
 
     def seed_technical_service(self):
         rows = []
@@ -847,7 +866,7 @@ CORE_STEPS = [
     "seed_technical_project", "seed_technical_service",
     "seed_service_contract", "seed_service_executor", "seed_professional_review",
     "seed_proposal", "seed_proposal_item", "seed_proposal_unit", "recompute_proposal_totals",
-    "seed_flux_log",
+    "seed_flux_log", "seed_connections",
 ]
 
 
