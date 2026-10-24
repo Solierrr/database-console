@@ -1,4 +1,3 @@
-import importlib.util
 import json
 from decimal import Decimal
 import os
@@ -274,14 +273,11 @@ class SeedPlanTest(unittest.TestCase):
         hashes = {row['password_hash'] for row in self.data.auth['local_credential']}
         self.assertEqual({PLAN['auth']['password_hash'], PLAN['dev_test_account']['password_hash']}, hashes)
 
-    def test_default_position_permissions_use_catalog_names_and_skip_admin(self):
-        migrations = ' '.join(path.read_text(encoding='utf-8') for path in (ROOT / 'db' / 'core' / 'migrations').glob('V*.sql'))
+    def test_default_position_permissions_skip_admin_and_stay_least_privilege(self):
         granted = PLAN['position_permissions']
         self.assertNotIn('ADMIN', granted)
         for position, names in granted.items():
             self.assertEqual(len(names), len(set(names)), position)
-            for name in names:
-                self.assertIn(f"'{name}'", migrations, f'{position}: permissao fora do catalogo: {name}')
         # menor privilegio: so ADMIN governa cargos/permissoes; leitura-apenas nao escreve
         forbidden = ('/api/position-permissions', '/api/positions', '/api/permissions')
         for names in granted.values():
@@ -348,12 +344,10 @@ class SeedPlanTest(unittest.TestCase):
             self.assertTrue(photo['public_id'].startswith('mocks/'))
 
 
-@unittest.skipUnless(os.environ.get('SOLARIA_TEST_PG_DSN'), 'Set an isolated PostgreSQL test DSN')
+@unittest.skipUnless(os.environ.get('SOLARIA_TEST_PG_DSN') and os.environ.get('SOLARIA_TEST_CORE_BASELINE'),
+                     'Set an isolated PostgreSQL test DSN and the api-core baseline SQL file')
 class SeedLoadTest(unittest.TestCase):
     def setUp(self):
-        spec = importlib.util.spec_from_file_location('migrate', ROOT / 'scripts/migrate.py')
-        self.runner = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(self.runner)
         self.connection = psycopg2.connect(os.environ['SOLARIA_TEST_PG_DSN'])
         self.schema = 'seed_' + uuid.uuid4().hex
         with self.connection.cursor() as cursor:
@@ -376,7 +370,8 @@ class SeedLoadTest(unittest.TestCase):
             return cursor.fetchone()[0]
 
     def test_load_is_complete_idempotent_and_resettable(self):
-        self.runner.migrate(self.connection, 'core')
+        with self.connection.cursor() as cursor:
+            cursor.execute(Path(os.environ['SOLARIA_TEST_CORE_BASELINE']).read_text(encoding='utf-8'))
         baseline = {table: self.count(table) for table in CORE_TABLES}
         dataset, _ = build(self.directory.name)
         load_dataset(dataset, core_connection=self.connection)

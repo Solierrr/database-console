@@ -97,7 +97,7 @@ POWERSHELL ?= powershell
 else
 POWERSHELL ?= pwsh
 endif
-.PHONY: dev-up dev-db dev-down dev-status dev-seed migrate schema seed seed-plan dataload indexes enums reset reset-mongo connect backup export-parquet roles-apply roles-check auth-mirror-check install-tools
+.PHONY: dev-up dev-db dev-down dev-status dev-seed schema seed-plan dataload reset reset-mongo connect backup export-parquet roles-apply roles-check install-tools
 
 
 
@@ -134,33 +134,16 @@ PSQL = psql "$(DATABASE_URI)" -f
 create:
 	psql "$(MAINT_URI)" -v ON_ERROR_STOP=1 -v DB=$(DB_NAME) -f db/create.sql
 
-migrate:
-	$(PSQL) db/$(TARGET)/migrations/V1__create_$(TARGET)_schema.sql
-migrate: ## Run the migrations of TARGET (core or auth)
-	python scripts/migrate.py --target $(TARGET) $(if $(BASELINE),--baseline $(BASELINE),)
-
-schema: ## Apply db/TARGET/schema.sql to an empty database
-	$(PSQL) db/$(TARGET)/schema.sql
-
-seed: ## Apply db/TARGET/seed.sql
-	$(PSQL) db/$(TARGET)/seed.sql
+schema: ## Apply db/analytics/schema.sql to the analytics database (TARGET=analytics)
+	@test "$(TARGET)" = "analytics" || { echo "schema: only TARGET=analytics; coredb and authdb are created by the Flyway of api-core and api-auth"; exit 1; }
+	$(PSQL) db/analytics/schema.sql
 
 # Seed planejado (empresas, unidades, catalogo, tecnicos, propostas). Ex.: make seed-plan ARGS=--dry-run
 seed-plan: ## Run the planned seed (ARGS=--dry-run to preview)
 	python -m seed $(ARGS)
 
-indexes: ## Apply db/TARGET/indexes.sql
-	$(PSQL) db/$(TARGET)/indexes.sql
-
-enums: ## Apply db/TARGET/enums.sql
-	$(PSQL) db/$(TARGET)/enums.sql
-
-reset: ## Drop and recreate the TARGET database from schema and seed
+reset: ## Drop and recreate the TARGET database empty (the Flyway of the API recreates the schema)
 	psql "$(MAINT_URI)" -f db/reset.sql -v DB=$(DB_NAME)
-	$(PSQL) db/$(TARGET)/enums.sql
-	$(PSQL) db/$(TARGET)/schema.sql
-	$(PSQL) db/$(TARGET)/seed.sql
-	$(PSQL) db/$(TARGET)/indexes.sql
 
 reset-mongo: ## Reset the messenger MongoDB database
 	mongosh "$(MONGO_URI)" db/messenger/reset.js
@@ -182,9 +165,6 @@ roles-apply: ## Create or refresh the read-only roles of the coredb consumers (O
 
 roles-check: ## Check the database against the read-only role contract (ONLY=consumer)
 	$(PY) scripts/roles.py check $(if $(ONLY),--only $(ONLY),)
-
-auth-mirror-check: ## Check that db/auth/migrations mirrors the api-auth Flyway migrations (API_AUTH_DIR)
-	$(PY) scripts/check_auth_mirror.py $(API_AUTH_DIR)
 
 install-tools: ## Install PostgreSQL, Python and mongosh with winget (Windows)
 	winget install --id PostgreSQL.PostgreSQL.16 -e

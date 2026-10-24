@@ -31,16 +31,6 @@ class ContractTest(unittest.TestCase):
             self.assertTrue(contract['description'], name)
             self.assertTrue('tables' in contract or contract.get('all_tables'), name)
 
-    def test_the_contract_names_only_tables_and_columns_of_the_core_schema(self):
-        schema = (ROOT / 'db/core/schema.sql').read_text(encoding='utf-8')
-        for name, contract in roles.load_contracts().items():
-            tables = contract.get('tables', {})
-            for table, columns in tables.items():
-                self.assertIn(f'CREATE TABLE {table} ', schema, f'{name}: {table}')
-                if columns != '*':
-                    for column in columns:
-                        self.assertRegex(schema, rf'\b{column}\b', f'{name}: {table}.{column}')
-
     def test_explicit_tables_resolve_to_table_or_column_grants(self):
         contract = {'tables': {'brand': '*', 'person': ['id', 'fk_users']}}
 

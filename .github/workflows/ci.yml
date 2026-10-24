@@ -30,15 +30,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Apply the schemas
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: python -m pip install -r scripts/requirements.txt
+
+      - name: Build
+        run: python -m compileall -q scripts seed
+
+      - name: Test
         env:
-          PGHOST: localhost
-          PGUSER: postgres
-          PGPASSWORD: test-password-for-ci
-        run: |
-          for target in core auth; do
-            psql --quiet --set ON_ERROR_STOP=1 --command "create database ${target}db"
-            for file in enums schema indexes seed; do
-              psql --quiet --set ON_ERROR_STOP=1 --dbname "${target}db" --file "db/${target}/${file}.sql"
-            done
-          done
+          SOLARIA_TEST_PG_DSN: postgresql://postgres:test-password-for-ci@localhost:5432/postgres
+        run: python -m unittest tests.test_roles -v

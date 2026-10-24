@@ -1,10 +1,11 @@
 #!/bin/sh
-# Stack local de desenvolvimento: Postgres + Redis (docker compose), migrations, seed planejado,
-# api-auth e api-core (mvnw) lendo esse banco. So para dev; credenciais abertas de proposito.
+# Stack local de desenvolvimento: Postgres + Redis (docker compose), api-auth e api-core (mvnw) e seed planejado.
+# O schema do coredb e do authdb e criado pelo Flyway do api-core e do api-auth ao subirem. So para dev; credenciais
+# abertas de proposito.
 #
-#   scripts/dev-stack.sh db       sobe so o Postgres e o Redis, roda migrations e seed e mostra como conectar no coredb
-#   scripts/dev-stack.sh up       sobe tudo (idempotente) e roda migrations e seed
-#   scripts/dev-stack.sh seed     recarrega o seed (use --reset antes para limpar: RESET=1)
+#   scripts/dev-stack.sh db       sobe so o Postgres e o Redis e carrega o seed se o schema ja existir
+#   scripts/dev-stack.sh up       sobe tudo (idempotente): as APIs criam o schema e depois roda o seed
+#   scripts/dev-stack.sh seed     recarrega o seed (use RESET=1 para limpar antes); exige o schema criado
 #   scripts/dev-stack.sh status   mostra o que esta de pe
 #   scripts/dev-stack.sh down     para as APIs e o compose (dados do banco sao mantidos)
 #   scripts/dev-stack.sh logs     caminho dos logs das APIs
@@ -54,14 +55,15 @@ db_env() {
 		DB_POSTGRES_CORE=coredb DB_POSTGRES_AUTH=authdb DB_POSTGRES_SSLMODE=disable
 }
 
-run_migrations() {
-	db_env
-	say "Migrations (core e auth)"
-	(cd "$ROOT" && python scripts/migrate.py --target core | tail -1 && python scripts/migrate.py --target auth | tail -1)
+schema_ready() {
+	for database in coredb:user_account authdb:auth_user; do
+		docker exec local-database-console-postgres psql -U solaria -d "${database%%:*}" -tAc "SELECT to_regclass('public.${database##*:}')" 2>/dev/null | grep -q . || return 1
+	done
 }
 
 run_seed() {
 	db_env
+	schema_ready || die "schema ausente no coredb/authdb: ele e criado pelo Flyway do api-core e do api-auth (rode 'sh scripts/dev-stack.sh up')"
 	export HOST=localhost PORT="$PG_PORT" USER=solaria PASSWORD=solaria SSLMODE=disable ENVIRONMENT=local CLOUDINARY_CLOUD_NAME="$CLOUD_NAME"
 	[ "${RESET:-0}" = 1 ] && (cd "$ROOT" && python -m seed --reset | tail -1)
 	say "Seed planejado"
@@ -103,8 +105,6 @@ cmd_up() {
 	ensure_keystore
 	say "Postgres e Redis (docker compose)"
 	(cd "$ROOT" && docker compose up -d --wait >/dev/null)
-	run_migrations
-	run_seed
 
 	export DB_POSTGRES_HOST=localhost DB_POSTGRES_PORT="$PG_PORT" DB_POSTGRES_USER=solaria DB_POSTGRES_PASSWORD=solaria \
 		UPSTASH_CORE_HOST=localhost UPSTASH_CORE_PORT="$REDIS_PORT" OTEL_TRACES_SAMPLING_PROBABILITY=0.0 \
@@ -119,6 +119,7 @@ cmd_up() {
 		start_api api-core "$API_CORE_DIR" "$CORE_PORT" /actuator/health
 	wait_api api-auth "$AUTH_PORT" /.well-known/jwks.json
 	wait_api api-core "$CORE_PORT" /actuator/health
+	run_seed
 	say "Stack pronta: api-core :$CORE_PORT, api-auth :$AUTH_PORT, postgres :$PG_PORT, redis :$REDIS_PORT"
 	say "Login de dev: <username>@seed.solaria.dev (senha no seed/README.md)"
 }
@@ -128,9 +129,12 @@ cmd_db() {
 	command -v python >/dev/null 2>&1 || die "python nao encontrado"
 	say "Postgres e Redis (docker compose)"
 	(cd "$ROOT" && docker compose up -d --wait >/dev/null)
-	run_migrations
-	run_seed
-	say "coredb pronto. Conecte com:"
+	if schema_ready; then
+		run_seed
+	else
+		say "Schema ainda nao criado: o Flyway do api-core e do api-auth cria o coredb e o authdb. Rode 'sh scripts/dev-stack.sh up'."
+	fi
+	say "Postgres pronto. Conecte com:"
 	say "  postgresql://solaria:solaria@localhost:$PG_PORT/coredb   (authdb no mesmo servidor)"
 	say "  psql: PGPASSWORD=solaria psql -h localhost -p $PG_PORT -U solaria -d coredb"
 	say "Variaveis para uma API Spring: DB_POSTGRES_HOST=localhost DB_POSTGRES_PORT=$PG_PORT DB_POSTGRES_USER=solaria DB_POSTGRES_PASSWORD=solaria DB_POSTGRES_CORE=coredb DB_POSTGRES_SSLMODE=disable"
