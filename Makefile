@@ -97,7 +97,7 @@ POWERSHELL ?= powershell
 else
 POWERSHELL ?= pwsh
 endif
-.PHONY: dev-up dev-db dev-down dev-status dev-seed schema seed-plan dataload reset reset-mongo connect backup export-parquet roles-apply roles-check install-tools
+.PHONY: dev-up dev-db dev-down dev-status dev-seed schema seed-plan dataload reset reset-mongo connect backup roles-apply roles-check install-tools
 
 
 
@@ -156,9 +156,6 @@ dataload: ## Load generated data (ROWS=1000)
 
 backup: ## Back up the PostgreSQL databases (TARGET=core|auth|all)
 	$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File scripts/backup-postgres.ps1 -Target "$(if $(filter command line,$(origin TARGET)),$(TARGET),)"
-
-export-parquet: ## Export the tables to Parquet for Databricks (TARGET=core|auth|all)
-	python scripts/export_parquet.py --target "$(if $(filter command line,$(origin TARGET)),$(TARGET),)"
 
 roles-apply: ## Create or refresh the read-only roles of the coredb consumers (ONLY=consumer)
 	$(PY) scripts/roles.py apply $(if $(ONLY),--only $(ONLY),)
