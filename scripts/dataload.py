@@ -40,7 +40,7 @@ def maybe(seq, p=0.7):     return pick(seq) if random.random() < p else None
 
 def unique_username() -> str:
     """Handle publico unico (@user), sempre minusculo -- combina com
-    ck_users_username_format em db/core/schema.sql."""
+    ck_user_account_username_format."""
     raw = re.sub(r"[^a-z0-9_]", "_", FAKE.unique.user_name().lower())
     raw = trunc(raw, 30)
     return raw if len(raw) >= 3 else raw.ljust(3, "0")
@@ -138,7 +138,7 @@ class Seeder:
                 FAKE.pydecimal(left_digits=3, right_digits=7, positive=False),
                 FAKE.pydecimal(left_digits=3, right_digits=7, positive=False),
             ))
-        self.insert("geolocalization", ["id", "fk_address", "latitude", "longitude"], rows)
+        self.insert("geolocation", ["id", "address_id", "latitude", "longitude"], rows)
 
     def seed_auth_user(self):
         rows = []
@@ -173,7 +173,7 @@ class Seeder:
                 FAKE.date_time_between("-1y", "now"),
             ))
         self.insert("local_credential", [
-            "user_id", "password_hash", "password_changed_at", "must_change", "created_at", "updated_at",
+            "auth_user_id", "password_hash", "password_changed_at", "is_password_change_required", "created_at", "updated_at",
         ], rows)
 
     def seed_federated_identity(self):
@@ -193,7 +193,7 @@ class Seeder:
                 maybe([FAKE.date_time_between("-30d", "now")]),
             ))
         self.insert("federated_identity", [
-            "id", "user_id", "authority", "issuer", "subject", "email", "email_verified",
+            "id", "auth_user_id", "authority", "issuer", "subject", "email", "is_email_verified",
             "created_at", "last_login_at",
         ], rows)
 
@@ -212,7 +212,7 @@ class Seeder:
                 created,
             ))
         self.insert("one_time_token", [
-            "id", "user_id", "token_hash", "type", "expires_at", "consumed_at", "created_at",
+            "id", "auth_user_id", "token_hash", "type", "expires_at", "consumed_at", "created_at",
         ], rows)
 
     def seed_auth_session(self):
@@ -238,7 +238,7 @@ class Seeder:
             ))
         self.ids.setdefault("auth_session", []).extend(r[0] for r in rows)
         self.insert("auth_session", [
-            "id", "user_id", "ip_address", "user_agent", "device", "authentication_methods",
+            "id", "auth_user_id", "ip_address", "user_agent", "device", "authentication_methods",
             "mfa_completed_at", "created_at", "last_access_at", "expires_at", "revoked_at", "revocation_reason",
         ], rows)
 
@@ -259,14 +259,14 @@ class Seeder:
                     chain_ids.append((previous_id, row_id))
                 previous_id = row_id
         self.insert("refresh_token", [
-            "id", "session_id", "token_hash", "consumed_at", "revoked_at", "replaced_by_id",
+            "id", "auth_session_id", "token_hash", "consumed_at", "revoked_at", "replaced_by_refresh_token_id",
             "expires_at", "created_at",
         ], rows)
         if chain_ids:
             with self.conn.cursor() as cur:
                 execute_values(
                     cur,
-                    "UPDATE refresh_token AS rt SET replaced_by_id = data.next_id "
+                    "UPDATE refresh_token AS rt SET replaced_by_refresh_token_id = data.next_id "
                     "FROM (VALUES %s) AS data (prev_id, next_id) WHERE rt.id = data.prev_id",
                     chain_ids,
                 )
@@ -283,7 +283,7 @@ class Seeder:
                 FAKE.date_time_between("-1y", "-6M"), FAKE.date_time_between("-6M", "now"),
             ))
         self.insert("totp_factor", [
-            "id", "user_id", "secret_ciphertext", "secret_nonce", "encryption_key_id", "algorithm",
+            "id", "auth_user_id", "secret_ciphertext", "secret_nonce", "encryption_key_id", "algorithm",
             "digits", "period_seconds", "enabled_at", "last_used_counter", "created_at", "updated_at",
         ], rows)
 
@@ -307,7 +307,7 @@ class Seeder:
                 FAKE.date_time_between("-180d", "now"),
             ))
         self.insert("security_event", [
-            "id", "user_id", "session_id", "event_type", "succeeded", "ip_address", "user_agent",
+            "id", "auth_user_id", "auth_session_id", "event_type", "is_successful", "ip_address", "user_agent",
             "details", "occurred_at",
         ], rows)
 
@@ -328,7 +328,7 @@ class Seeder:
             "published_at", "attempts",
         ], rows)
 
-    def seed_users(self):
+    def seed_user_account(self):
         rows = []
         for auth_id in self.ids["auth_user"]:
             row_id = new_id()
@@ -338,24 +338,24 @@ class Seeder:
                 maybe([pick_media("banner")[0]], p=0.3),
                 random.random() < 0.95,
             ))
-        self.ids.setdefault("users", []).extend(r[0] for r in rows)
-        self.insert("users", ["id", "auth_id", "username", "avatar", "banner", "active"], rows)
+        self.ids.setdefault("user_account", []).extend(r[0] for r in rows)
+        self.insert("user_account", ["id", "auth_id", "username", "avatar", "banner", "is_active"], rows)
 
     def seed_person(self):
         rows = []
-        for user_id in self.ids["users"]:
+        for user_id in self.ids["user_account"]:
             row_id = new_id()
             rows.append((
                 row_id, user_id, maybe(self.ids["contact"]), trunc(FAKE.name(), 60),
                 gen_cpf(), FAKE.date_of_birth(minimum_age=18, maximum_age=75),
             ))
         self.ids.setdefault("person", []).extend(r[0] for r in rows)
-        self.insert("person", ["id", "fk_users", "fk_contact", "name", "cpf", "birth_date"], rows)
+        self.insert("person", ["id", "user_id", "contact_id", "name", "cpf", "birth_date"], rows)
 
     def seed_position(self):
-        rows = [(new_id(), r["name"], r["accesses"]) for r in catalog("position")]
-        self.ids["position"] = [r[0] for r in rows]
-        self.insert("position", ["id", "name", "accesses"], rows)
+        rows = [(new_id(), r["name"], r["accesses"]) for r in catalog("job_position")]
+        self.ids["job_position"] = [r[0] for r in rows]
+        self.insert("job_position", ["id", "name", "accesses"], rows)
 
     def seed_permission(self):
         rows = [
@@ -368,14 +368,14 @@ class Seeder:
     def seed_position_permission(self):
         rows = []
         seen = set()
-        for position_id in self.ids["position"]:
+        for position_id in self.ids["job_position"]:
             for permission_id in random.sample(self.ids["permission"], k=random.randint(2, 6)):
                 key = (position_id, permission_id)
                 if key in seen:
                     continue
                 seen.add(key)
                 rows.append((new_id(), position_id, permission_id))
-        self.insert("position_permission", ["id", "id_position", "id_permission"], rows)
+        self.insert("position_permission", ["id", "job_position_id", "permission_id"], rows)
 
     def seed_business_contact(self):
         rows = []
@@ -397,38 +397,38 @@ class Seeder:
             ))
         self.ids.setdefault("company", []).extend(r[0] for r in rows)
         self.insert("company", [
-            "id", "status", "fk_address", "fk_business_contact", "cnpj", "trade_name",
+            "id", "status", "address_id", "business_contact_id", "cnpj", "trade_name",
             "corporate_name",
         ], rows)
 
     def seed_company_plans(self):
-        rows = [(new_id(), r["name"], float(r["value"]), r["cycle"]) for r in catalog("company_plans")]
-        self.ids["company_plans"] = [r[0] for r in rows]
-        self.insert("company_plans", ["id", "name", "value", "cycle"], rows)
+        rows = [(new_id(), r["name"], float(r["price"]), r["cycle"]) for r in catalog("company_plan")]
+        self.ids["company_plan"] = [r[0] for r in rows]
+        self.insert("company_plan", ["id", "name", "price", "cycle"], rows)
 
     def seed_company_positions(self):
         rows = []
         seen = set()
         for company_id in self.ids["company"]:
-            for position_id in random.sample(self.ids["position"], k=random.randint(1, len(self.ids["position"]))):
+            for position_id in random.sample(self.ids["job_position"], k=random.randint(1, len(self.ids["job_position"]))):
                 key = (company_id, position_id)
                 if key in seen:
                     continue
                 seen.add(key)
                 rows.append((new_id(), company_id, position_id))
-        self.insert("company_positions", ["id", "fk_company", "fk_position"], rows)
+        self.insert("company_position", ["id", "company_id", "job_position_id"], rows)
 
     def seed_user_company(self):
         rows = []
         seen = set()
-        for user_id in self.ids["users"]:
+        for user_id in self.ids["user_account"]:
             company_id = pick(self.ids["company"])
             key = (company_id, user_id)
             if key in seen:
                 continue
             seen.add(key)
-            rows.append((new_id(), company_id, user_id, pick(self.ids["position"])))
-        self.insert("user_company", ["id", "fk_company", "fk_users", "fk_position"], rows)
+            rows.append((new_id(), company_id, user_id, pick(self.ids["job_position"])))
+        self.insert("user_company", ["id", "company_id", "user_id", "job_position_id"], rows)
 
     def seed_supplier(self):
         rows = []
@@ -436,7 +436,7 @@ class Seeder:
             row_id = new_id()
             rows.append((row_id, company_id, pick(["ACTIVE", "ACTIVE", "SUSPENDED", "DEACTIVATED"])))
         self.ids.setdefault("supplier", []).extend(r[0] for r in rows)
-        self.insert("supplier", ["id", "fk_company", "status"], rows)
+        self.insert("supplier", ["id", "company_id", "status"], rows)
 
     def seed_subscription(self):
         rows = []
@@ -444,13 +444,13 @@ class Seeder:
             row_id = new_id()
             start = FAKE.date_time_between("-2y", "-30d")
             rows.append((
-                row_id, supplier_id, pick(self.ids["company_plans"]),
+                row_id, supplier_id, pick(self.ids["company_plan"]),
                 pick(["PAID", "PAID", "IN_DEBT", "SUSPENDED"]), random.random() < 0.8,
                 start, maybe([start + timedelta(days=365)], p=0.4),
             ))
         self.ids.setdefault("subscription", []).extend(r[0] for r in rows)
         self.insert("subscription", [
-            "id", "fk_supplier", "fk_plan", "status", "auto_renewal", "start_date", "end_date",
+            "id", "supplier_id", "company_plan_id", "status", "has_auto_renewal", "starts_at", "ends_at",
         ], rows)
 
     def seed_charge(self):
@@ -466,7 +466,7 @@ class Seeder:
                 FAKE.date_time_between(due, due + timedelta(days=5)) if paid else None,
             ))
         self.insert("charge", [
-            "id", "fk_subscription", "amount", "payment_method", "status", "due_date", "payment_date",
+            "id", "subscription_id", "amount", "payment_method", "status", "due_date", "paid_at",
         ], rows)
 
     def seed_model(self):
@@ -488,7 +488,7 @@ class Seeder:
                          pick(["APPROVED", "APPROVED", "UNDER_ANALYSIS", "REJECTED"])))
         self.insert("brand", ["id", "name", "normalized_name", "visibility"], brands)
         self.ids.setdefault("model", []).extend(r[0] for r in rows)
-        self.insert("model", ["id", "fk_brand", "model", "power_wp", "efficiency", "type", "width", "length", "weight", "status"], rows)
+        self.insert("model", ["id", "brand_id", "model_name", "power_wp", "efficiency", "type", "width", "length", "weight", "status"], rows)
 
     def seed_offer(self):
         rows = []
@@ -501,11 +501,11 @@ class Seeder:
             ))
         self.ids.setdefault("offer", []).extend(r[0] for r in rows)
         self.insert("offer", [
-            "id", "fk_supplier", "fk_model", "unit_price", "availability", "expiration_date",
+            "id", "supplier_id", "model_id", "unit_price", "availability", "expires_at",
         ], rows)
 
     def seed_inventory(self):
-        # UNIQUE(fk_supplier, fk_model) no banco real -- nao pode repetir o par.
+        # UNIQUE(supplier_id, model_id) no banco real -- nao pode repetir o par.
         max_pairs = len(self.ids["supplier"]) * len(self.ids["model"])
         target = min(self.n(150), max_pairs)
         rows = []
@@ -516,7 +516,7 @@ class Seeder:
                 continue
             seen.add(pair)
             rows.append((new_id(), pair[0], pair[1], random.randint(0, 1000)))
-        self.insert("inventory", ["id", "fk_supplier", "fk_model", "quantity"], rows)
+        self.insert("inventory", ["id", "supplier_id", "model_id", "quantity"], rows)
 
     def seed_profession(self):
         rows = [
@@ -524,7 +524,7 @@ class Seeder:
             for r in catalog("profession")
         ]
         self.ids["profession"] = [r[0] for r in rows]
-        self.insert("profession", ["id", "name", "accept_emergency_call", "requires_registration"], rows)
+        self.insert("profession", ["id", "name", "is_emergency_call_accepted", "is_registration_required"], rows)
 
     def seed_technician(self):
         rows = []
@@ -532,7 +532,7 @@ class Seeder:
             row_id = new_id()
             rows.append((row_id, person_id, trunc("CREA-" + FAKE.estado_sigla() + " " + digits(6), 60)))
         self.ids.setdefault("technician", []).extend(r[0] for r in rows)
-        self.insert("technician", ["id", "fk_person", "crea"], rows)
+        self.insert("technician", ["id", "person_id", "crea"], rows)
 
     def seed_certification(self):
         rows = []
@@ -546,7 +546,7 @@ class Seeder:
                 maybe([FAKE.date_time_between("now", "+3y")], p=0.7),
             ))
         self.ids.setdefault("certification", []).extend(r[0] for r in rows)
-        self.insert("certification", ["id", "fk_technician", "type", "information", "issuer", "validity"], rows)
+        self.insert("certification", ["id", "technician_id", "type", "information", "issuer", "valid_until_at"], rows)
 
     def seed_professional_registration(self):
         rows = []
@@ -558,14 +558,14 @@ class Seeder:
             ))
         self.ids.setdefault("professional_registration", []).extend(r[0] for r in rows)
         self.insert("professional_registration", [
-            "id", "fk_technician", "fk_profession", "council", "number", "expiration_date",
+            "id", "technician_id", "profession_id", "council", "number", "expires_at",
         ], rows)
 
     def seed_certification_record(self):
         rows = []
         for _ in range(self.n(60)):
             rows.append((new_id(), pick(self.ids["professional_registration"]), pick(self.ids["certification"])))
-        self.insert("certification_record", ["id", "fk_professional_registration", "fk_certification"], rows)
+        self.insert("certification_record", ["id", "professional_registration_id", "certification_id"], rows)
 
     def seed_technician_affiliation(self):
         rows = []
@@ -577,7 +577,7 @@ class Seeder:
             ))
         self.ids.setdefault("technician_affiliation", []).extend(r[0] for r in rows)
         self.insert("technician_affiliation", [
-            "id", "fk_company", "fk_technician", "affiliation_type", "active",
+            "id", "company_id", "technician_id", "affiliation_type", "is_active",
         ], rows)
 
     def seed_shift(self):
@@ -590,7 +590,7 @@ class Seeder:
                         "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY",
                     ]), start, start + timedelta(hours=8),
                 ))
-        self.insert("shift", ["id", "fk_technician", "day_week", "start_date", "end_date"], rows)
+        self.insert("shift", ["id", "technician_id", "day_week", "starts_at", "ends_at"], rows)
 
     def seed_technical_course(self):
         rows = []
@@ -599,14 +599,14 @@ class Seeder:
                 new_id(), maybe(self.ids["company"], p=0.5), trunc(FAKE.catch_phrase(), 30),
                 pick_text("business_note", "note"), FAKE.url(),
             ))
-        self.insert("technical_course", ["id", "fk_company", "title", "information", "link"], rows)
+        self.insert("technical_course", ["id", "company_id", "title", "information", "link"], rows)
 
     def seed_requester(self):
         rows = []
         for company_id in random.sample(self.ids["company"], k=min(len(self.ids["company"]), self.n(80))):
             rows.append((new_id(), company_id))
         self.ids.setdefault("requester", []).extend(r[0] for r in rows)
-        self.insert("requester", ["id", "fk_company"], rows)
+        self.insert("requester", ["id", "company_id"], rows)
 
     def seed_local_unit(self):
         rows = []
@@ -617,7 +617,7 @@ class Seeder:
                 maybe([f"Apto {random.randint(1, 200)}"], p=0.3), pick(["BUILDING", "HOUSE", "COMPLEX"]),
             ))
         self.ids.setdefault("local_unit", []).extend(r[0] for r in rows)
-        self.insert("local_unit", ["id", "fk_requester", "fk_address", "complement", "location_type"], rows)
+        self.insert("local_unit", ["id", "requester_id", "address_id", "complement", "location_type"], rows)
 
     def seed_unit_specifications(self):
         rows = []
@@ -627,8 +627,8 @@ class Seeder:
                 pick_media("unit_specifications_photos")[0],
                 FAKE.date_time_between("-1y", "now"),
             ))
-        self.insert("unit_specifications", [
-            "id", "fk_local_unit", "specifications", "location_photos", "date",
+        self.insert("unit_specification", [
+            "id", "local_unit_id", "specifications", "location_photos", "date",
         ], rows)
 
     def seed_energy_bill(self):
@@ -639,15 +639,15 @@ class Seeder:
                 FAKE.pydecimal(left_digits=3, right_digits=2, positive=True),
                 FAKE.pydecimal(left_digits=3, right_digits=2, positive=True),
             ))
-        self.insert("energy_bill", ["id", "fk_local_unit", "consumption", "price"], rows)
+        self.insert("energy_bill", ["id", "local_unit_id", "consumption", "amount"], rows)
 
     def seed_technical_project(self):
         with self.conn.cursor() as cur:
-            cur.execute("""SELECT u.id, u.fk_requester, r.fk_company,
+            cur.execute("""SELECT u.id, u.requester_id, r.company_id,
                 a.state, left(a.city,120), left(a.neighborhood,120), a.zip_code,
                 left(a.street,180), a.number, left(u.complement,180)
-                FROM local_unit u JOIN requester r ON r.id=u.fk_requester
-                LEFT JOIN address a ON a.id=u.fk_address""")
+                FROM local_unit u JOIN requester r ON r.id=u.requester_id
+                LEFT JOIN address a ON a.id=u.address_id""")
             locations = cur.fetchall()
         rows = []
         for index in range(self.n(100)):
@@ -660,7 +660,7 @@ class Seeder:
                          maybe([start + timedelta(days=5 + index % 86)], p=0.8), company_id, *address))
         self.ids.setdefault("technical_project", []).extend(r[0] for r in rows)
         self.insert("technical_project", [
-            "id", "fk_requester", "fk_local_unit", "status", "start_date", "end_date", "owner_company_id",
+            "id", "requester_id", "local_unit_id", "status", "starts_at", "ends_at", "owner_company_id",
             "location_state", "location_city", "location_neighborhood", "location_zip_code",
             "location_street", "location_number", "location_complement",
         ], rows)
@@ -668,14 +668,14 @@ class Seeder:
     def seed_connections(self):
         with self.conn.cursor() as cur:
             cur.execute("""
-                SELECT u.id FROM users u WHERE u.active AND u.id=ANY(%s::uuid[]) AND u.managed_by_company_id IS NULL
-                AND cardinality(u.connections)=0
-                AND EXISTS(SELECT 1 FROM person p WHERE p.fk_users=u.id)
+                SELECT u.id FROM user_account u WHERE u.is_active AND u.id=ANY(%s::uuid[]) AND u.managed_by_company_id IS NULL
+                AND cardinality(u.connection_user_ids)=0
+                AND EXISTS(SELECT 1 FROM person p WHERE p.user_id=u.id)
                 ORDER BY u.id LIMIT 3
-            """, (self.ids.get("users", []),))
+            """, (self.ids.get("user_account", []),))
             users = [row[0] for row in cur.fetchall()]
             if len(users) >= 2:
-                cur.execute("UPDATE users SET connections=ARRAY[%s]::uuid[] WHERE id=%s AND cardinality(connections)=0",
+                cur.execute("UPDATE user_account SET connection_user_ids=ARRAY[%s]::uuid[] WHERE id=%s AND cardinality(connection_user_ids)=0",
                             (users[1], users[0]))
 
     def seed_technical_service(self):
@@ -688,14 +688,14 @@ class Seeder:
             rows.append((
                 row_id, pick(self.ids["technical_project"]), pick_text("technical_service_purpose", "purpose"), status,
                 maybe([created + timedelta(days=1)], p=0.6), created,
-                pick(self.ids["users"]) if accepted else None,
+                pick(self.ids["user_account"]) if accepted else None,
                 (created + timedelta(days=1)) if accepted else None,
                 (created + timedelta(days=10)) if status == "COMPLETED" else None,
             ))
         self.ids.setdefault("technical_service", []).extend(r[0] for r in rows)
         self.insert("technical_service", [
-            "id", "fk_technical_project", "purpose", "status", "scheduled_date", "created_at",
-            "accepted_by", "accepted_at", "end_date",
+            "id", "technical_project_id", "purpose", "status", "scheduled_at", "created_at",
+            "accepted_by_user_id", "accepted_at", "ends_at",
         ], rows)
 
     def seed_service_contract(self):
@@ -707,7 +707,7 @@ class Seeder:
                 random.random() < 0.5,
             ))
         self.insert("service_contract", [
-            "id", "fk_service", "warranty", "delivery_deadline", "insurance", "utility_approval",
+            "id", "technical_service_id", "warranty", "delivery_deadline_date", "has_insurance", "has_utility_approval",
         ], rows)
 
     def seed_service_executor(self):
@@ -718,7 +718,7 @@ class Seeder:
                     new_id(), service_id, pick(self.ids["technician_affiliation"]),
                     pick(["lead installer", "electrician", "supervisor", "helper"]),
                 ))
-        self.insert("service_executor", ["id", "fk_service", "fk_technician_affiliation", "function"], rows)
+        self.insert("service_executor", ["id", "technical_service_id", "technician_affiliation_id", "function"], rows)
 
     def seed_professional_review(self):
         rows = []
@@ -728,7 +728,7 @@ class Seeder:
         ]
         for _ in range(self.n(150)):
             technician_id = pick(self.ids["technician"])
-            reviewer_id = pick(self.ids["users"])
+            reviewer_id = pick(self.ids["user_account"])
             service_id = pick(completed_services)
             key = (reviewer_id, technician_id, service_id)
             if key in seen:
@@ -740,7 +740,7 @@ class Seeder:
                 pick_text("review_comment", "comment"), random.random() < 0.95, FAKE.date_time_between("-1y", "now"),
             ))
         self.insert("professional_review", [
-            "id", "fk_professional", "fk_reviewer", "fk_service", "rating", "comment", "active", "created_at",
+            "id", "technician_id", "reviewer_user_id", "technical_service_id", "rating", "comment", "is_active", "created_at",
         ], rows)
 
     def seed_proposal(self):
@@ -756,7 +756,7 @@ class Seeder:
             ))
         self.ids.setdefault("proposal", []).extend(r[0] for r in rows)
         self.insert("proposal", [
-            "id", "fk_requester", "status", "notes", "total_amount", "created_at", "updated_at",
+            "id", "requester_id", "status", "notes", "total_amount", "created_at", "updated_at",
         ], rows)
 
     def seed_proposal_item(self):
@@ -770,7 +770,7 @@ class Seeder:
                 ))
         self.ids.setdefault("proposal_item", []).extend(r[0] for r in rows)
         self.insert("proposal_item", [
-            "id", "fk_proposal", "fk_offer", "quantity", "negotiated_price", "discount",
+            "id", "proposal_id", "offer_id", "quantity", "negotiated_unit_price", "discount",
         ], rows)
 
     def seed_proposal_unit(self):
@@ -780,7 +780,7 @@ class Seeder:
                 new_id(), proposal_item_id, pick(self.ids["local_unit"]), random.randint(1, 5),
                 maybe([pick_text("business_note", "note")], p=0.3),
             ))
-        self.insert("proposal_unit", ["id", "fk_proposal_item", "fk_local_unit", "quantity", "note"], rows)
+        self.insert("proposal_unit", ["id", "proposal_item_id", "local_unit_id", "quantity", "note"], rows)
 
     def recompute_proposal_totals(self):
         # fn_proposal_total() nunca existiu no banco (nem em db/core/procedures,
@@ -790,12 +790,12 @@ class Seeder:
                 UPDATE proposal p
                 SET total_amount = sub.total
                 FROM (
-                    SELECT pi.fk_proposal AS proposal_id,
-                           SUM(pi.quantity * COALESCE(pi.negotiated_price, o.unit_price)
+                    SELECT pi.proposal_id AS proposal_id,
+                           SUM(pi.quantity * COALESCE(pi.negotiated_unit_price, o.unit_price)
                                - COALESCE(pi.discount, 0)) AS total
                     FROM proposal_item pi
-                    JOIN offer o ON o.id = pi.fk_offer
-                    GROUP BY pi.fk_proposal
+                    JOIN offer o ON o.id = pi.offer_id
+                    GROUP BY pi.proposal_id
                 ) sub
                 WHERE p.id = sub.proposal_id
             """)
@@ -805,14 +805,14 @@ class Seeder:
         rows = []
         for _ in range(self.n(300)):
             rows.append((
-                new_id(), pick(self.ids["users"]),
+                new_id(), pick(self.ids["user_account"]),
                 trunc(pick([
                     "LOGIN", "VIEW_PROPOSAL", "CREATE_PROPOSAL", "UPDATE_COMPANY",
                     "VIEW_CATALOG", "ACCEPT_PROPOSAL", "REJECT_PROPOSAL",
                 ]), 255),
                 FAKE.date_time_between("-1y", "now"),
             ))
-        self.insert("flux_log", ["id", "fk_user", "action", "created_at"], rows)
+        self.insert("flux_log", ["id", "user_id", "action", "created_at"], rows)
 
 
 TARGETS = ("core", "auth")
@@ -842,9 +842,9 @@ def connect(target: str):
 USAGE = "uso: python -m scripts.dataload [rows]"
 
 # auth_user e as tabelas que dependem dele vivem no banco do api-auth;
-# users e tudo o resto vive no banco do api-core -- sao dois bancos
+# user_account e tudo o resto vive no banco do api-core -- sao dois bancos
 # Postgres fisicamente separados, entao precisam de duas conexoes. A fase
-# auth roda primeiro porque users.auth_id referencia os IDs gerados aqui.
+# auth roda primeiro porque user_account.auth_id referencia os IDs gerados aqui.
 AUTH_STEPS = [
     "seed_auth_user", "seed_local_credential", "seed_federated_identity",
     "seed_one_time_token", "seed_auth_session",
@@ -853,7 +853,7 @@ AUTH_STEPS = [
 
 CORE_STEPS = [
     "seed_address", "seed_contact", "seed_geolocalization",
-    "seed_users", "seed_person",
+    "seed_user_account", "seed_person",
     "seed_position", "seed_permission", "seed_position_permission",
     "seed_business_contact", "seed_company",
     "seed_company_plans", "seed_company_positions", "seed_user_company",
