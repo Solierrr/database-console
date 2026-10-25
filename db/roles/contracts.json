@@ -1,96 +1,114 @@
 {
-  "version": 1,
-  "database": "coredb",
-  "comment": "Contrato de leitura do coredb por consumidor. Tabelas com \"*\" liberam todas as colunas; uma lista libera só aquelas colunas. Nada além de SELECT é concedido. Quem adiciona uma tabela ou coluna ao seu SQL atualiza este arquivo e roda `python scripts/roles.py apply`.",
+  "version": 2,
+  "comment": "Contrato de acesso direto aos bancos, por consumidor. Cada papel (grupo, sem login) recebe privilegios por banco (core = coredb, auth = authdb) e por schema. Papeis de leitura enxergam apenas o schema export (views); nada em public. Tabelas com \"*\" liberam todas as colunas; uma lista libera so aquelas colunas. Quem adiciona uma view ou coluna ao export atualiza este arquivo e roda `python scripts/roles.py apply`.",
   "consumers": {
-    "api-recommendation": {
-      "role": "solaria_ro_recommendation",
-      "description": "Feeds de recomendação (ofertas, profissionais e fornecedores) pelo fallback SQL e pelo grafo.",
-      "tables": {
-        "brand": "*",
-        "certification": "*",
-        "company": "*",
-        "inventory": "*",
-        "model": "*",
-        "offer": "*",
-        "person": ["id", "fk_users"],
-        "profession": "*",
-        "professional_registration": "*",
-        "professional_review": "*",
-        "proposal": "*",
-        "proposal_item": "*",
-        "service_executor": "*",
-        "subscription": "*",
-        "supplier": "*",
-        "technical_service": "*",
-        "technician": "*",
-        "technician_affiliation": "*",
-        "users": ["id", "active"]
-      }
-    },
     "database-bootstrap": {
-      "role": "solaria_ro_bootstrap",
+      "role": "ro_bootstrap",
       "description": "Job que extrai o coredb e monta o grafo Neo4j.",
-      "tables": {
-        "brand": "*",
-        "certification": "*",
-        "company": "*",
-        "geolocalization": "*",
-        "inventory": "*",
-        "local_unit": "*",
-        "model": "*",
-        "offer": "*",
-        "person": ["id", "fk_users"],
-        "profession": "*",
-        "professional_registration": "*",
-        "professional_review": "*",
-        "proposal": "*",
-        "proposal_item": "*",
-        "service_executor": "*",
-        "shift": "*",
-        "subscription": "*",
-        "supplier": "*",
-        "technical_project": "*",
-        "technical_service": "*",
-        "technician": "*",
-        "technician_affiliation": "*",
-        "users": ["id", "active"]
-      }
-    },
-    "mcp-database": {
-      "role": "solaria_ro_mcp",
-      "description": "Ferramentas MCP que o assistente consulta direto (técnicos, profissões e itens de fixação).",
-      "tables": {
-        "address": "*",
-        "brand": "*",
-        "company": "*",
-        "model": "*",
-        "offer": "*",
-        "person": ["id", "name"],
-        "profession": "*",
-        "professional_registration": "*",
-        "supplier": "*",
-        "technician": "*",
-        "technician_affiliation": "*"
+      "grants": {
+        "core": {
+          "schema": "export",
+          "privileges": [
+            "SELECT"
+          ],
+          "tables": {
+            "brand": "*",
+            "certification": "*",
+            "company": "*",
+            "geolocation": "*",
+            "inventory": "*",
+            "local_unit": "*",
+            "model": "*",
+            "offer": "*",
+            "person": [
+              "id",
+              "user_id"
+            ],
+            "profession": "*",
+            "professional_registration": "*",
+            "professional_review": "*",
+            "proposal": "*",
+            "proposal_item": "*",
+            "service_executor": "*",
+            "shift": "*",
+            "subscription": "*",
+            "supplier": "*",
+            "technical_project": "*",
+            "technical_service": "*",
+            "technician": "*",
+            "technician_affiliation": "*",
+            "user_account": [
+              "id",
+              "is_active"
+            ]
+          }
+        }
       }
     },
     "databricks-sync": {
-      "role": "solaria_ro_databricks",
-      "description": "Replicação para o Databricks. Proposta: todas as tabelas, menos as de dado pessoal sensível ou segredo, e sem as colunas de contato e documento. Só vale depois do dono confirmar o que o pipeline precisa (T-046 e T-033).",
-      "all_tables": true,
-      "exclude_tables": [
-        "access_code",
-        "order_payment",
-        "professional_document",
-        "professional_onboarding",
-        "professional_submission",
-        "solaria_schema_history"
+      "role": "ro_databricks",
+      "description": "Replicacao para o Databricks: todas as views do schema export do coredb e do authdb. Use um login por banco.",
+      "grants": {
+        "core": {
+          "schema": "export",
+          "privileges": [
+            "SELECT"
+          ],
+          "all_tables": true
+        },
+        "auth": {
+          "schema": "export",
+          "privileges": [
+            "SELECT"
+          ],
+          "all_tables": true
+        }
+      }
+    },
+    "database-rpa": {
+      "role": "rpa_writer",
+      "description": "Excecao documentada ao dono unico do coredb: ETL do database-rpa. Escreve direto nas tabelas que ja usa, so em QA.",
+      "environments": [
+        "qa"
       ],
-      "exclude_columns": {
-        "person": ["cpf", "birth_date"],
-        "contact": ["email", "phone"],
-        "business_contact": ["phone"],
-        "energy_bill": ["photo_url", "photo_public_id"]
+      "grants": {
+        "core": {
+          "schema": "public",
+          "privileges": [
+            "SELECT",
+            "INSERT",
+            "UPDATE"
+          ],
+          "tables": {
+            "address": "*",
+            "brand": "*",
+            "business_contact": "*",
+            "certification": "*",
+            "company": "*",
+            "company_photo": "*",
+            "company_plan": "*",
+            "company_position": "*",
+            "contact": "*",
+            "inventory": "*",
+            "job_position": "*",
+            "local_unit": "*",
+            "model": "*",
+            "model_photo": "*",
+            "offer": "*",
+            "person": "*",
+            "profession": "*",
+            "professional_registration": "*",
+            "requester": "*",
+            "subscription": "*",
+            "supplier": "*",
+            "technical_project": "*",
+            "technician": "*",
+            "technician_affiliation": "*",
+            "user_account": "*",
+            "user_company": "*",
+            "user_photo": "*"
+          }
+        }
       }
     }
   }
