@@ -391,14 +391,16 @@ class Seeder:
             row_id = new_id()
             trade_name = trunc(FAKE.company(), 100)
             rows.append((
-                row_id, pick(["UNDER_ANALYSIS", "APPROVED", "APPROVED", "REJECTED"]),
+                row_id, pick(["UNDER_ANALYSIS", "APPROVED", "APPROVED", "REJECTED"]), pick(["SUPPLIER", "REQUESTER"]),
                 pick(self.ids["address"]), pick(self.ids["business_contact"]),
-                gen_cnpj(), trade_name, trunc(FAKE.company() + " " + FAKE.company_suffix(), 120),
+                gen_cnpj(), trade_name, trunc(FAKE.company() + " " + FAKE.company_suffix(), 120), f"empresa-{row_id.hex}",
             ))
         self.ids.setdefault("company", []).extend(r[0] for r in rows)
+        for kind in ("SUPPLIER", "REQUESTER"):
+            self.ids.setdefault(f"company_{kind.lower()}", []).extend(r[0] for r in rows if r[2] == kind)
         self.insert("company", [
-            "id", "status", "address_id", "business_contact_id", "cnpj", "trade_name",
-            "corporate_name",
+            "id", "status", "type", "address_id", "business_contact_id", "cnpj", "trade_name",
+            "corporate_name", "slug",
         ], rows)
 
     def seed_company_plans(self):
@@ -432,7 +434,7 @@ class Seeder:
 
     def seed_supplier(self):
         rows = []
-        for company_id in random.sample(self.ids["company"], k=min(len(self.ids["company"]), self.n(60))):
+        for company_id in random.sample(self.ids["company_supplier"], k=min(len(self.ids["company_supplier"]), self.n(60))):
             row_id = new_id()
             rows.append((row_id, company_id, pick(["ACTIVE", "ACTIVE", "SUSPENDED", "DEACTIVATED"])))
         self.ids.setdefault("supplier", []).extend(r[0] for r in rows)
@@ -497,11 +499,11 @@ class Seeder:
             rows.append((
                 row_id, pick(self.ids["supplier"]), pick(self.ids["model"]),
                 FAKE.pydecimal(left_digits=4, right_digits=2, positive=True), random.randint(0, 500),
-                maybe([FAKE.date_time_between("now", "+1y")], p=0.5),
+                maybe([FAKE.date_time_between("now", "+1y")], p=0.5), f"oferta-{row_id.hex}",
             ))
         self.ids.setdefault("offer", []).extend(r[0] for r in rows)
         self.insert("offer", [
-            "id", "supplier_id", "model_id", "unit_price", "availability", "expires_at",
+            "id", "supplier_id", "model_id", "unit_price", "availability", "expires_at", "slug",
         ], rows)
 
     def seed_inventory(self):
@@ -530,9 +532,9 @@ class Seeder:
         rows = []
         for person_id in random.sample(self.ids["person"], k=min(len(self.ids["person"]), self.n(100))):
             row_id = new_id()
-            rows.append((row_id, person_id, trunc("CREA-" + FAKE.estado_sigla() + " " + digits(6), 60)))
+            rows.append((row_id, person_id, trunc("CREA-" + FAKE.estado_sigla() + " " + digits(6), 60), f"tecnico-{row_id.hex}"))
         self.ids.setdefault("technician", []).extend(r[0] for r in rows)
-        self.insert("technician", ["id", "person_id", "crea"], rows)
+        self.insert("technician", ["id", "person_id", "crea", "slug"], rows)
 
     def seed_certification(self):
         rows = []
@@ -603,7 +605,7 @@ class Seeder:
 
     def seed_requester(self):
         rows = []
-        for company_id in random.sample(self.ids["company"], k=min(len(self.ids["company"]), self.n(80))):
+        for company_id in random.sample(self.ids["company_requester"], k=min(len(self.ids["company_requester"]), self.n(80))):
             rows.append((new_id(), company_id))
         self.ids.setdefault("requester", []).extend(r[0] for r in rows)
         self.insert("requester", ["id", "company_id"], rows)
@@ -752,7 +754,7 @@ class Seeder:
                 row_id, pick(self.ids["requester"]),
                 pick(["AWAITING_SUPPLIER", "AWAITING_REQUESTER", "ACCEPTED", "REJECTED", "CANCELED"]),
                 maybe([pick_text("business_note", "note")], p=0.5), None, created,
-                maybe([created + timedelta(days=random.randint(1, 20))], p=0.6),
+                created + timedelta(days=random.randint(0, 20)),
             ))
         self.ids.setdefault("proposal", []).extend(r[0] for r in rows)
         self.insert("proposal", [
