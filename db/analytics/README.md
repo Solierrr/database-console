@@ -5,15 +5,15 @@ um banco existente. Depois, `make schema TARGET=analytics ENVIRONMENT=prod`
 aplica `db/analytics/schema.sql`. Para QA, use `ENVIRONMENT=qa` (`analyticsdbqa`).
 Esses comandos não foram executados nesta alteração.
 
-O schema `analytics_gold` recebe tabelas com os mesmos nomes e colunas das
-19 views `workspace.gold_core` listadas em
+O schema `gold` recebe tabelas com os mesmos nomes e colunas das
+19 tabelas do schema `gold` do catálogo `analytics` do Databricks, listadas em
 `databricks-sync/gold_export_manifest.json`. O exportador cria essas tabelas
 na primeira carga e exige schema idêntico nas seguintes. O DDL não antecipa
 tipos que só serão conhecidos após a pipeline publicar cada view. Uma mudança
 de estrutura exige migração revisada; o exportador falha sem substituir dados.
 
 `schema.sql` cria apenas o schema, o registro privado
-`analytics_gold.principal_access` e a função de autorização. A carga aplica
+`gold.principal_access` e a função de autorização. A carga aplica
 Row Level Security forçado nas tabelas KPI. O registro começa vazio. A equipe
 de banco deve cadastrar logins verificados com `scope` `ADMIN`, `EXPORTER`,
 `SUPPLIER`, `REQUESTER` ou `PROFESSIONAL`, `entity_id` (identificador da
