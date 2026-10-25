@@ -33,7 +33,8 @@ def digits(n: int) -> str: return "".join(random.choices(string.digits, k=n))
 def digits_only(value: str) -> str: return re.sub(r"\D", "", value)
 def gen_cpf() -> str: return digits_only(FAKE.cpf())
 def gen_cnpj() -> str: return digits_only(FAKE.cnpj())
-def new_id() -> uuid.UUID: return uuid.uuid4()
+_ID_RANDOM = random.Random(42)
+def new_id() -> uuid.UUID: return uuid.UUID(int=_ID_RANDOM.getrandbits(128), version=4)
 def pick(seq):             return random.choice(seq)
 def maybe(seq, p=0.7):     return pick(seq) if random.random() < p else None
 
@@ -95,14 +96,14 @@ class Seeder:
     def n(self, base: int) -> int:
         return max(1, round(base * self.scale))
 
-    def insert(self, table: str, columns: list[str], rows: list[tuple], conflict: str = "") -> None:
+    def insert(self, table: str, columns: list[str], rows: list[tuple], conflict: str = " ON CONFLICT DO NOTHING") -> None:
         if not rows:
             return
         col_list = ", ".join(columns)
-        sql = f"INSERT INTO {table} ({col_list}) VALUES %s{conflict}"
+        sql = f"INSERT INTO {table} ({col_list}) VALUES %s{conflict} RETURNING 1"
         with self.conn.cursor() as cur:
-            execute_values(cur, sql, rows, page_size=500)
-        print(f"  {table}: {len(rows)} linha(s)")
+            inserted = execute_values(cur, sql, rows, page_size=500, fetch=True)
+        print(f"  {table}: {len(inserted)} de {len(rows)} linha(s) inserida(s)")
 
     def seed_address(self):
         rows = []
@@ -186,7 +187,7 @@ class Seeder:
                 user_id,
                 "FIREBASE",
                 "https://securetoken.google.com/solaria",
-                uuid.uuid4().hex,
+                new_id().hex,
                 FAKE.email(),
                 random.random() < 0.8,
                 FAKE.date_time_between("-1y", "now"),
@@ -278,7 +279,7 @@ class Seeder:
             row_id = new_id()
             rows.append((
                 row_id, auth_id, FAKE.sha256().encode()[:32], FAKE.sha256().encode()[:12],
-                "key-" + uuid.uuid4().hex[:8], pick(["SHA1", "SHA256", "SHA512"]), 6, 30,
+                "key-" + new_id().hex[:8], pick(["SHA1", "SHA256", "SHA512"]), 6, 30,
                 maybe([FAKE.date_time_between("-1y", "now")]), maybe([random.randint(1, 999)]),
                 FAKE.date_time_between("-1y", "-6M"), FAKE.date_time_between("-6M", "now"),
             ))
@@ -352,18 +353,21 @@ class Seeder:
         self.ids.setdefault("person", []).extend(r[0] for r in rows)
         self.insert("person", ["id", "user_id", "contact_id", "name", "cpf", "birth_date"], rows)
 
-    def existing_ids(self, table: str) -> list:
+    def existing_ids(self, table: str, names: list[str] | None = None, order: str = "id") -> list:
         with self.conn.cursor() as cur:
-            cur.execute(f"SELECT id FROM {table} ORDER BY id")
+            if names is None:
+                cur.execute(f"SELECT id FROM {table} ORDER BY {order}")
+            else:
+                cur.execute(f"SELECT id FROM {table} WHERE name = ANY(%s) ORDER BY name", (names,))
             return [row[0] for row in cur.fetchall()]
 
     def seed_position(self):
         rows = [(new_id(), r["name"], r["accesses"]) for r in catalog("job_position")]
         self.insert("job_position", ["id", "name", "accesses"], rows, " ON CONFLICT (name) DO NOTHING")
-        self.ids["job_position"] = self.existing_ids("job_position")
+        self.ids["job_position"] = self.existing_ids("job_position", [r["name"] for r in catalog("job_position")])
 
     def seed_permission(self):
-        self.ids["permission"] = self.existing_ids("permission")
+        self.ids["permission"] = self.existing_ids("permission", order="permission_name")
 
     def seed_position_permission(self):
         rows = []
@@ -375,7 +379,7 @@ class Seeder:
                     continue
                 seen.add(key)
                 rows.append((new_id(), position_id, permission_id))
-        self.insert("position_permission", ["id", "job_position_id", "permission_id"], rows, " ON CONFLICT DO NOTHING")
+        self.insert("position_permission", ["id", "job_position_id", "permission_id"], rows)
 
     def seed_business_contact(self):
         rows = []
@@ -407,9 +411,9 @@ class Seeder:
         with self.conn.cursor() as cur:
             cur.execute("SELECT name FROM company_plan")
             known = {row[0] for row in cur.fetchall()}
-        rows = [(new_id(), r["name"], float(r["price"]), r["cycle"]) for r in catalog("company_plan") if r["name"] not in known]
-        self.insert("company_plan", ["id", "name", "price", "cycle"], rows)
-        self.ids["company_plan"] = self.existing_ids("company_plan")
+        rows = [(new_id(), r["name"], float(r["price"]), r["cycle"]) for r in catalog("company_plan")]
+        self.insert("company_plan", ["id", "name", "price", "cycle"], [row for row in rows if row[1] not in known])
+        self.ids["company_plan"] = self.existing_ids("company_plan", [r["name"] for r in catalog("company_plan")])
 
     def seed_company_positions(self):
         rows = []
@@ -652,7 +656,7 @@ class Seeder:
                 a.state, left(a.city,120), left(a.neighborhood,120), a.zip_code,
                 left(a.street,180), a.number, left(u.complement,180)
                 FROM local_unit u JOIN requester r ON r.id=u.requester_id
-                LEFT JOIN address a ON a.id=u.address_id""")
+                LEFT JOIN address a ON a.id=u.address_id ORDER BY u.id""")
             locations = cur.fetchall()
         rows = []
         for index in range(self.n(100)):
