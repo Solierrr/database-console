@@ -371,13 +371,6 @@ class Builder:
         next(row for row in self.data.auth['auth_user'] if row['id'] == auth_id)['primary_email'] = account['email']
         next(row for row in self.data.auth['local_credential'] if row['auth_user_id'] == auth_id)['password_hash'] = account['password_hash']
         next(row for row in self.data.core['user_company'] if row['user_id'] == user_id)['job_position_id'] = self.positions['ADMIN']
-        for group in groups:
-            if group['company'] != technical['company']:
-                self.add('user_company', {
-                    'id': uid('user_company', f'dev:{username}', group['company']),
-                    'company_id': uid('company', group['company']), 'user_id': user_id,
-                    'job_position_id': self.positions['ADMIN'],
-                })
         self.add('platform_admin', {'id': uid('platform_admin', 'dev-test'), 'user_id': user_id, 'created_at': self.when(-90)})
         for project in self.data.core['technical_project']:
             self.add('project_member', {

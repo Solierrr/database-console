@@ -71,12 +71,12 @@ class SeedPlanTest(unittest.TestCase):
         units_by_requester = Counter(row['requester_id'] for row in self.data.core['local_unit'])
         self.assertEqual(10, max(units_by_requester.values()))
 
-    def test_single_test_account_has_all_development_contexts(self):
+    def test_single_test_account_has_one_membership_and_all_development_contexts(self):
         auth = next(row for row in self.data.auth['auth_user'] if row['primary_email'] == 'teste@teste')
         user = next(row for row in self.data.core['user_account'] if row['auth_id'] == auth['id'])
         self.assertIsNone(user['managed_by_company_id'])
         memberships = [row for row in self.data.core['user_company'] if row['user_id'] == user['id']]
-        self.assertEqual(3, len(memberships))
+        self.assertEqual(1, len(memberships))
         self.assertTrue(all(row['job_position_id'].name == 'ADMIN' for row in memberships))
         self.assertTrue(any(row['user_id'] == user['id'] for row in self.data.core['platform_admin']))
         person = next(row for row in self.data.core['person'] if row['user_id'] == user['id'])
@@ -86,6 +86,10 @@ class SeedPlanTest(unittest.TestCase):
         self.assertTrue(all(row['is_active'] and row['role'] == 'MANAGER' for row in members))
         credential = next(row for row in self.data.auth['local_credential'] if row['auth_user_id'] == auth['id'])
         self.assertEqual(PLAN['dev_test_account']['password_hash'], credential['password_hash'])
+
+    def test_each_user_has_at_most_one_company_membership(self):
+        users = Counter(row['user_id'] for row in self.data.core['user_company'])
+        self.assertEqual(1, max(users.values()))
 
     def test_panel_and_infrastructure_rows_respect_product_rules(self):
         models = self.data.core['model']

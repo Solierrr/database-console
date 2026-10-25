@@ -83,7 +83,7 @@ Casos de borda para testar filtros: modelos em análise e reprovados, ofertas ex
 
 ### Conta única para testar a interface
 
-`teste@teste` / `Batata123` é uma conta exclusiva do seed local: profissional, administradora da plataforma e ADMIN nas empresas Rede Aurora Hoteis, SolMax Distribuidora e Raio de Sol. Possui participação de gestão nos projetos do seed. As contas por cargo permanecem disponíveis para testar permissões mais restritas. A conta é criada no fim do build sem alterar IDs ou dados das contas existentes. A carga incremental não exige reset.
+`teste@teste` / `Batata123` é uma conta exclusiva do seed local: profissional, administradora da plataforma e ADMIN na empresa Raio de Sol (o baseline permite um vínculo de empresa por usuário). Possui participação de gestão nos projetos do seed. As contas por cargo permanecem disponíveis para testar permissões mais restritas. A conta é criada no fim do build sem alterar IDs ou dados das contas existentes. A carga incremental não exige reset.
 
 ## Compras de demonstração
 
