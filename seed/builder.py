@@ -765,7 +765,7 @@ class Builder:
             self.add('proposal', {
                 'id': proposal_id, 'requester_id': info['requester'], 'supplier_id': supplier_id, 'status': status,
                 'notes': 'Proposta gerada pelo seed planejado.', 'total_amount': round(total, 2),
-                'created_at': self.when(-self.rng.randint(3, 160)), 'updated_at': None,
+                'created_at': self.when(-self.rng.randint(3, 160)),
             })
             for item_id, quantity in item_rows:
                 units = self.rng.sample(info['units'], min(len(info['units']), self.rng.randint(1, 3)))
