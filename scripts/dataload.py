@@ -95,11 +95,11 @@ class Seeder:
     def n(self, base: int) -> int:
         return max(1, round(base * self.scale))
 
-    def insert(self, table: str, columns: list[str], rows: list[tuple]) -> None:
+    def insert(self, table: str, columns: list[str], rows: list[tuple], conflict: str = "") -> None:
         if not rows:
             return
         col_list = ", ".join(columns)
-        sql = f"INSERT INTO {table} ({col_list}) VALUES %s"
+        sql = f"INSERT INTO {table} ({col_list}) VALUES %s{conflict}"
         with self.conn.cursor() as cur:
             execute_values(cur, sql, rows, page_size=500)
         print(f"  {table}: {len(rows)} linha(s)")
@@ -352,18 +352,18 @@ class Seeder:
         self.ids.setdefault("person", []).extend(r[0] for r in rows)
         self.insert("person", ["id", "user_id", "contact_id", "name", "cpf", "birth_date"], rows)
 
+    def existing_ids(self, table: str) -> list:
+        with self.conn.cursor() as cur:
+            cur.execute(f"SELECT id FROM {table} ORDER BY id")
+            return [row[0] for row in cur.fetchall()]
+
     def seed_position(self):
         rows = [(new_id(), r["name"], r["accesses"]) for r in catalog("job_position")]
-        self.ids["job_position"] = [r[0] for r in rows]
-        self.insert("job_position", ["id", "name", "accesses"], rows)
+        self.insert("job_position", ["id", "name", "accesses"], rows, " ON CONFLICT (name) DO NOTHING")
+        self.ids["job_position"] = self.existing_ids("job_position")
 
     def seed_permission(self):
-        rows = [
-            (new_id(), r["permission_name"], r["permission_name"].split(":")[0].title(), r["description"])
-            for r in catalog("permission")
-        ]
-        self.ids["permission"] = [r[0] for r in rows]
-        self.insert("permission", ["id", "permission_name", "name", "description"], rows)
+        self.ids["permission"] = self.existing_ids("permission")
 
     def seed_position_permission(self):
         rows = []
@@ -375,7 +375,7 @@ class Seeder:
                     continue
                 seen.add(key)
                 rows.append((new_id(), position_id, permission_id))
-        self.insert("position_permission", ["id", "job_position_id", "permission_id"], rows)
+        self.insert("position_permission", ["id", "job_position_id", "permission_id"], rows, " ON CONFLICT DO NOTHING")
 
     def seed_business_contact(self):
         rows = []
@@ -404,9 +404,12 @@ class Seeder:
         ], rows)
 
     def seed_company_plans(self):
-        rows = [(new_id(), r["name"], float(r["price"]), r["cycle"]) for r in catalog("company_plan")]
-        self.ids["company_plan"] = [r[0] for r in rows]
+        with self.conn.cursor() as cur:
+            cur.execute("SELECT name FROM company_plan")
+            known = {row[0] for row in cur.fetchall()}
+        rows = [(new_id(), r["name"], float(r["price"]), r["cycle"]) for r in catalog("company_plan") if r["name"] not in known]
         self.insert("company_plan", ["id", "name", "price", "cycle"], rows)
+        self.ids["company_plan"] = self.existing_ids("company_plan")
 
     def seed_company_positions(self):
         rows = []
