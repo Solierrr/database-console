@@ -352,7 +352,7 @@ class SeedPlanTest(unittest.TestCase):
 
 
 @unittest.skipUnless(os.environ.get('SOLARIA_TEST_PG_DSN') and os.environ.get('SOLARIA_TEST_CORE_BASELINE'),
-                     'Set an isolated PostgreSQL test DSN and the api-core baseline SQL file')
+                     'Set an isolated PostgreSQL test DSN and the api-core migrations directory')
 class SeedLoadTest(unittest.TestCase):
     def setUp(self):
         self.connection = psycopg2.connect(os.environ['SOLARIA_TEST_PG_DSN'])
@@ -378,10 +378,9 @@ class SeedLoadTest(unittest.TestCase):
 
     def test_load_is_complete_idempotent_and_resettable(self):
         with self.connection.cursor() as cursor:
-            cursor.execute(Path(os.environ['SOLARIA_TEST_CORE_BASELINE']).read_text(encoding='utf-8'))
-            for name in sorted({name for names in PLAN['position_permissions'].values() for name in names}):
-                cursor.execute('INSERT INTO permission (permission_name, name, description) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING',
-                               (name, name[:150], name))
+            migrations = [path for path in Path(os.environ['SOLARIA_TEST_CORE_BASELINE']).glob('V*.sql') if 'export' not in path.name]
+            for migration in sorted(migrations, key=lambda path: int(path.name[1:].split('__')[0])):
+                cursor.execute(migration.read_text(encoding='utf-8'))
         baseline = {table: self.count(table) for table in CORE_TABLES}
         dataset, _ = build(self.directory.name)
         load_dataset(dataset, core_connection=self.connection)

@@ -30,7 +30,7 @@ Os containers se chamam `local-database-console-postgres` e `local-database-cons
 
 ## Segredos e backup PostgreSQL
 
-Para testar o que depende de um Postgres, defina `SOLARIA_TEST_PG_DSN` apontando para um Postgres descartável e execute `python -m unittest discover -s tests -v`. Os testes de papéis criam objetos próprios e os removem no fim. O teste de carga do seed também exige `SOLARIA_TEST_CORE_BASELINE`, o caminho do `V1__baseline.sql` do `api-core`.
+Para testar o que depende de um Postgres, defina `SOLARIA_TEST_PG_DSN` apontando para um Postgres descartável e execute `python -m unittest discover -s tests -v`. Os testes de papéis criam objetos próprios e os removem no fim. O teste de carga do seed também exige `SOLARIA_TEST_CORE_BASELINE`, a pasta `db/migration` do `api-core` (V1 a V3).
 
 Extraia as credenciais do ambiente desejado com `make vault ENV=qa` (`local`, `qa` ou `prod`; o padrão é `local`). Ele grava o `.env` a partir do Infisical (pasta `/database`) e exige o Infisical CLI com `infisical login`. O arquivo `.env` é local e ignorado pelo Git. `make help` lista os demais comandos.
 
