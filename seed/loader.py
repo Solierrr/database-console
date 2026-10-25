@@ -12,7 +12,7 @@ from .builder import AUTH_TABLES, CATALOG_DIR, CORE_TABLES, REFERENCE_TABLES, Re
 
 psycopg2.extras.register_uuid()
 
-PRIMARY_KEYS = {'local_credential': 'user_id'}
+PRIMARY_KEYS = {'local_credential': 'auth_user_id'}
 
 
 def load_plan(path):
@@ -56,22 +56,22 @@ def catalog_rows(name):
 
 
 def ensure_reference_rows(cursor):
-    cursor.execute('SELECT name FROM position')
+    cursor.execute('SELECT name FROM job_position')
     known = {row[0] for row in cursor.fetchall()}
-    for row in catalog_rows('position'):
+    for row in catalog_rows('job_position'):
         if row['name'] not in known:
-            cursor.execute('INSERT INTO position(name, accesses) VALUES (%s, %s)', (row['name'], row['accesses']))
+            cursor.execute('INSERT INTO job_position(name, accesses) VALUES (%s, %s)', (row['name'], row['accesses']))
     cursor.execute('SELECT name FROM profession')
     known = {row[0] for row in cursor.fetchall()}
     for row in catalog_rows('profession'):
         if row['name'] not in known:
             cursor.execute('INSERT INTO profession(name) VALUES (%s)', (row['name'],))
-    cursor.execute('SELECT name FROM company_plans')
+    cursor.execute('SELECT name FROM company_plan')
     known = {row[0] for row in cursor.fetchall()}
-    for row in catalog_rows('company_plans'):
+    for row in catalog_rows('company_plan'):
         if row['name'] not in known:
-            cursor.execute('INSERT INTO company_plans(name, value, cycle) VALUES (%s, %s, %s)',
-                           (row['name'], row['value'], row['cycle']))
+            cursor.execute('INSERT INTO company_plan(name, price, cycle) VALUES (%s, %s, %s)',
+                           (row['name'], row['price'], row['cycle']))
 
 
 def reference_ids(cursor):
@@ -113,7 +113,7 @@ def delete_project_children(cursor, project_ids):
     removed = 0
     if project_ids:
         for table in PROJECT_CHILD_TABLES:
-            cursor.execute(f'DELETE FROM {table} WHERE project_id = ANY(%s)', (project_ids,))
+            cursor.execute(f'DELETE FROM {table} WHERE technical_project_id = ANY(%s)', (project_ids,))
             removed += cursor.rowcount
     return removed
 

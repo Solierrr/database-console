@@ -36,18 +36,18 @@ def apply(auth, core):
             )
             auth_id = cursor.fetchone()[0]
             cursor.execute(
-                '''INSERT INTO local_credential (user_id, password_hash, must_change)
+                '''INSERT INTO local_credential (auth_user_id, password_hash, is_password_change_required)
                    VALUES (%s, %s, false)
-                   ON CONFLICT (user_id) DO UPDATE SET
-                       password_hash = EXCLUDED.password_hash, must_change = false,
+                   ON CONFLICT (auth_user_id) DO UPDATE SET
+                       password_hash = EXCLUDED.password_hash, is_password_change_required = false,
                        password_changed_at = now(), updated_at = now()''',
                 (auth_id, PASSWORD_HASH),
             )
         with core.cursor() as cursor:
             cursor.execute(
-                '''INSERT INTO users (id, auth_id, username, active)
+                '''INSERT INTO user_account (id, auth_id, username, is_active)
                    VALUES (%s, %s, %s, true)
-                   ON CONFLICT (auth_id) DO UPDATE SET active = true''',
+                   ON CONFLICT (auth_id) DO UPDATE SET is_active = true''',
                 (USER_ID, auth_id, USERNAME),
             )
 
