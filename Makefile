@@ -158,10 +158,10 @@ backup: ## Back up the PostgreSQL databases (TARGET=core|auth|all)
 	$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File scripts/backup-postgres.ps1 -Target "$(if $(filter command line,$(origin TARGET)),$(TARGET),)"
 
 roles-apply: ## Create or refresh the consumer roles of coredb and authdb (ONLY=consumer, ENVIRONMENT=qa for rpa_writer)
-	$(PY) scripts/roles.py apply --environment $(ENVIRONMENT) $(if $(ONLY),--only $(ONLY),)
+	$(PY) scripts/roles.py apply --environment $(call unquote,$(ENVIRONMENT)) $(if $(ONLY),--only $(ONLY),)
 
 roles-check: ## Check the databases against the role contract (ONLY=consumer, ENVIRONMENT=qa for rpa_writer)
-	$(PY) scripts/roles.py check --environment $(ENVIRONMENT) $(if $(ONLY),--only $(ONLY),)
+	$(PY) scripts/roles.py check --environment $(call unquote,$(ENVIRONMENT)) $(if $(ONLY),--only $(ONLY),)
 
 install-tools: ## Install PostgreSQL, Python and mongosh with winget (Windows)
 	winget install --id PostgreSQL.PostgreSQL.16 -e
