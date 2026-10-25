@@ -60,7 +60,7 @@ def list_columns(connection, schema):
 def resolve_grants(grant, existing):
     """Contrato -> {tabela: None (todas as colunas) | [colunas]}. Falha se citar tabela ou coluna que não existe."""
     if grant.get('all_tables'):
-        return {table: None for table in existing}
+        return dict.fromkeys(existing)
     grants = {}
     for table, columns in grant['tables'].items():
         if table not in existing:
@@ -143,53 +143,69 @@ def apply(connection, name, contract, database, existing=None):
     print(f'{name}: {role} em {database} com acesso a {len(grants)} objeto(s) de {grant["schema"]}')
 
 
+def has_privilege(cursor, query, *arguments):
+    cursor.execute(query, arguments)
+    return cursor.fetchone()[0]
+
+
+def check_write_privileges(cursor, name, role, label, allowed, expected):
+    problems = []
+    for privilege in TABLE_PRIVILEGES:
+        if privilege == 'SELECT':
+            continue
+        has = has_privilege(cursor, 'SELECT has_table_privilege(%s, %s, %s)', role, label, privilege)
+        wanted = privilege in allowed and expected is None
+        if has and not wanted:
+            problems.append(f'{name}: {role} tem {privilege} em {label}')
+        if wanted and not has:
+            problems.append(f'{name}: {role} não tem {privilege} em {label}')
+    return problems
+
+
+def check_read_privileges(cursor, name, role, label, columns, expected):
+    table_wide = has_privilege(cursor, 'SELECT has_table_privilege(%s, %s, %s)', role, label, 'SELECT')
+    if expected is None:
+        return [] if table_wide else [f'{name}: {role} não lê {label}']
+    problems = []
+    if table_wide:
+        problems.append(f'{name}: {role} lê {label} inteira, mas o contrato libera só {expected or "nada"}')
+    for column in columns:
+        readable = has_privilege(cursor, 'SELECT has_column_privilege(%s, %s, %s, %s)', role, label, column, 'SELECT') and not table_wide
+        if readable and column not in expected:
+            problems.append(f'{name}: {role} lê {label}.{column}, que não está no contrato')
+        if not readable and column in expected:
+            problems.append(f'{name}: {role} não lê {label}.{column}, que está no contrato')
+    return problems
+
+
+def check_schema(cursor, name, role, schema, existing, expected_grants, allowed):
+    problems = []
+    for table, columns in existing.items():
+        label = f'{schema}.{table}'
+        expected = expected_grants.get(table, [])
+        problems += check_write_privileges(cursor, name, role, label, allowed, expected)
+        problems += check_read_privileges(cursor, name, role, label, columns, expected)
+    if has_privilege(cursor, 'SELECT has_schema_privilege(%s, %s, %s)', role, schema, 'CREATE'):
+        problems.append(f'{name}: {role} pode criar objetos no schema {schema}')
+    return problems
+
+
 def check(connection, name, contract, database, existing_by_schema=None):
     """Compara o banco com o contrato. Devolve a lista de divergências (vazia = tudo certo)."""
     grant = contract['grants'][database]
     role = contract['role']
     allowed = tuple(grant.get('privileges', ['SELECT']))
-    problems = []
     if not role_exists(connection, role):
         return [f'{name}: o papel {role} não existe']
+    problems = []
     with connection.cursor() as cursor:
         for schema in schemas_of(connection, grant):
             existing = (existing_by_schema or {}).get(schema)
             if existing is None:
                 existing = list_columns(connection, schema)
             expected_grants = resolve_grants(grant, existing) if schema == grant['schema'] else {}
-            for table, columns in existing.items():
-                label = f'{schema}.{table}'
-                expected = expected_grants.get(table, [])
-                for privilege in TABLE_PRIVILEGES:
-                    if privilege == 'SELECT':
-                        continue
-                    cursor.execute('SELECT has_table_privilege(%s, %s, %s)', (role, label, privilege))
-                    has = cursor.fetchone()[0]
-                    wanted = privilege in allowed and expected is None
-                    if has and not wanted:
-                        problems.append(f'{name}: {role} tem {privilege} em {label}')
-                    if wanted and not has:
-                        problems.append(f'{name}: {role} não tem {privilege} em {label}')
-                cursor.execute('SELECT has_table_privilege(%s, %s, %s)', (role, label, 'SELECT'))
-                table_wide = cursor.fetchone()[0]
-                if expected is None:
-                    if not table_wide:
-                        problems.append(f'{name}: {role} não lê {label}')
-                    continue
-                if table_wide:
-                    problems.append(f'{name}: {role} lê {label} inteira, mas o contrato libera só {expected or "nada"}')
-                for column in columns:
-                    cursor.execute('SELECT has_column_privilege(%s, %s, %s, %s)', (role, label, column, 'SELECT'))
-                    readable = cursor.fetchone()[0] and not table_wide
-                    if readable and column not in expected:
-                        problems.append(f'{name}: {role} lê {label}.{column}, que não está no contrato')
-                    if not readable and column in expected:
-                        problems.append(f'{name}: {role} não lê {label}.{column}, que está no contrato')
-            cursor.execute('SELECT has_schema_privilege(%s, %s, %s)', (role, schema, 'CREATE'))
-            if cursor.fetchone()[0]:
-                problems.append(f'{name}: {role} pode criar objetos no schema {schema}')
-        cursor.execute("SELECT has_database_privilege(%s, current_database(), 'CREATE')", (role,))
-        if cursor.fetchone()[0]:
+            problems += check_schema(cursor, name, role, schema, existing, expected_grants, allowed)
+        if has_privilege(cursor, "SELECT has_database_privilege(%s, current_database(), 'CREATE')", role):
             problems.append(f'{name}: {role} pode criar objetos no banco')
     return problems
 
