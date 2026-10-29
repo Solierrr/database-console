@@ -14,9 +14,9 @@ NAMESPACE = uuid.UUID('6f1c1b2e-5d3a-4f7e-9a41-0c2d8b7e5a10')
 CATALOG_DIR = Path(__file__).resolve().parents[1] / 'scripts' / 'data' / 'catalog'
 
 CORE_TABLES = [
-    'address', 'geolocalization', 'business_contact', 'company', 'users', 'person', 'technician',
-    'company_positions', 'position_permission', 'user_company', 'requester', 'supplier', 'technical_company', 'subscription',
-    'brand', 'model', 'offer', 'offer_translation', 'inventory', 'local_unit', 'unit_specifications',
+    'address', 'geolocation', 'business_contact', 'company', 'user_account', 'person', 'technician',
+    'company_position', 'position_permission', 'user_company', 'requester', 'supplier', 'technical_company', 'subscription',
+    'brand', 'model', 'offer', 'offer_translation', 'inventory', 'local_unit', 'unit_specification',
     'proposal', 'proposal_item', 'proposal_unit', 'cart', 'cart_item', 'purchase_order', 'order_item', 'order_payment',
     'professional_registration', 'professional_onboarding', 'certification',
     'certification_record', 'technician_affiliation', 'technical_project', 'technical_service',
@@ -24,7 +24,7 @@ CORE_TABLES = [
     'model_photo', 'platform_admin',
 ]
 AUTH_TABLES = ['auth_user', 'local_credential']
-REFERENCE_TABLES = {'position': 'name', 'profession': 'name', 'company_plans': 'name', 'permission': 'permission_name'}
+REFERENCE_TABLES = {'job_position': 'name', 'profession': 'name', 'company_plan': 'name', 'permission': 'permission_name'}
 
 FIRST_NAMES = [
     'Ana', 'Bruno', 'Carla', 'Daniel', 'Elisa', 'Fabio', 'Gabriela', 'Henrique', 'Isabela', 'Joao',
@@ -108,7 +108,7 @@ class Builder:
         self.units_by_company = {}
         self.offers = []
         self.affiliations = []
-        self.positions = {name: Ref('position', name) for name in read_catalog('position', 'name')}
+        self.positions = {name: Ref('job_position', name) for name in read_catalog('job_position', 'name')}
         self.domain = plan['auth']['email_domain']
 
     # ---------- helpers ----------
@@ -133,10 +133,10 @@ class Builder:
             'neighborhood': self.rng.choice(['Centro', 'Jardim America', 'Vila Nova', 'Boa Vista', 'Santa Cruz']),
             'zip_code': zip_code, 'street': self.rng.choice(self.plan['streets']),
             'number': str(self.rng.choice(SEGMENT_STREET_NUMBERS)),
-            'fk_owner_company': owner_company_id,
+            'owner_company_id': owner_company_id,
         })
-        self.add('geolocalization', {
-            'id': uid('geo', label), 'fk_address': address_id,
+        self.add('geolocation', {
+            'id': uid('geo', label), 'address_id': address_id,
             'latitude': round(city['lat'] + self.rng.uniform(-0.06, 0.06), 7),
             'longitude': round(city['lon'] + self.rng.uniform(-0.06, 0.06), 7),
         })
@@ -161,8 +161,8 @@ class Builder:
         auth_id = uid('auth', key)
         avatar = self.pool.unique(avatar_category)
         banner = self.pool.repeat_any(['users/banners/landscapes', 'users/banners/colors', 'users/banners/abstract'], self.rng)
-        self.add('users', {
-            'id': user_id, 'auth_id': auth_id, 'username': username, 'active': True,
+        self.add('user_account', {
+            'id': user_id, 'auth_id': auth_id, 'username': username, 'is_active': True,
             'managed_by_company_id': company_id if company_id and position != 'ADMIN' else None,
             'avatar': self.pool.url(avatar) if avatar else None,
             'banner': self.pool.url(banner) if banner else None,
@@ -172,24 +172,24 @@ class Builder:
             'email_verified_at': self.when(-30), 'status': 'ACTIVE',
         })
         self.add('local_credential', {
-            'user_id': auth_id, 'password_hash': self.plan['auth']['password_hash'], 'must_change': False,
+            'auth_user_id': auth_id, 'password_hash': self.plan['auth']['password_hash'], 'is_password_change_required': False,
         })
         person_id = uid('person', key)
         self.add('person', {
-            'id': person_id, 'fk_users': user_id, 'fk_contact': None, 'name': name,
+            'id': person_id, 'user_id': user_id, 'contact_id': None, 'name': name,
             'cpf': make_cpf(self.rng), 'birth_date': (self.today - timedelta(days=self.rng.randint(25 * 365, 58 * 365))),
         })
         for image, kind in ((avatar, 'PROFILE'), (banner, 'BANNER')):
             if image:
                 self.add('user_photo', {
-                    'id': uid('user_photo', key, kind), 'fk_user': user_id, 'type': kind,
+                    'id': uid('user_photo', key, kind), 'user_id': user_id, 'type': kind,
                     'url': self.pool.url(image), 'public_id': self.pool.public_id(image), 'created_at': self.when(-20),
                     **self.pool.crop_columns(image),
                 })
         if company_id is not None:
             self.add('user_company', {
-                'id': uid('user_company', key), 'fk_company': company_id, 'fk_users': user_id,
-                'fk_position': self.positions[position],
+                'id': uid('user_company', key), 'company_id': company_id, 'user_id': user_id,
+                'job_position_id': self.positions[position],
             })
         return user_id, person_id, name
 
@@ -202,8 +202,8 @@ class Builder:
             'website': f'https://{key}.{self.domain}',
         })
         self.add('company', {
-            'id': company_id, 'status': status, 'type': ctype, 'fk_address': address_id,
-            'fk_business_contact': contact_id, 'cnpj': make_cnpj(self.rng), 'trade_name': name[:120],
+            'id': company_id, 'status': status, 'type': ctype, 'address_id': address_id,
+            'business_contact_id': contact_id, 'cnpj': make_cnpj(self.rng), 'trade_name': name[:120],
             'corporate_name': f'{name} Ltda'[:120], 'slug': key,
         })
         logo = self.pool.unique('enterprises/pfp')
@@ -211,7 +211,7 @@ class Builder:
         for image, kind in ((logo, 'PROFILE'), (banner, 'BANNER')):
             if image:
                 self.add('company_photo', {
-                    'id': uid('company_photo', key, kind), 'fk_company': company_id, 'type': kind,
+                    'id': uid('company_photo', key, kind), 'company_id': company_id, 'type': kind,
                     'url': self.pool.url(image), 'public_id': self.pool.public_id(image), 'created_at': self.when(-40),
                     **self.pool.crop_columns(image),
                 })
@@ -219,8 +219,8 @@ class Builder:
 
     def company_positions(self, company_id, names):
         for name in names:
-            self.add('company_positions', {
-                'id': uid('company_position', company_id, name), 'fk_company': company_id, 'fk_position': self.positions[name],
+            self.add('company_position', {
+                'id': uid('company_position', company_id, name), 'company_id': company_id, 'job_position_id': self.positions[name],
             })
 
     # ---------- groups ----------
@@ -247,17 +247,17 @@ class Builder:
             for permission in permissions:
                 self.add('position_permission', {
                     'id': uid('position_permission', position, permission),
-                    'id_position': self.positions[position], 'id_permission': Ref('permission', permission),
+                    'job_position_id': self.positions[position], 'permission_id': Ref('permission', permission),
                 })
 
     def build_demandants(self):
         overrides = self.plan.get('company_status_overrides', {})
         for entry in self.plan['demandants']:
             key = entry['key']
-            company_id = self.company(key, entry['name'], 'DEMANDANT', entry['cities'][0], entry['banner_theme'],
+            company_id = self.company(key, entry['name'], 'REQUESTER', entry['cities'][0], entry['banner_theme'],
                                       overrides.get(key, 'APPROVED'))
             requester_id = uid('requester', key)
-            self.add('requester', {'id': requester_id, 'fk_company': company_id, 'business_type': entry['segment']})
+            self.add('requester', {'id': requester_id, 'company_id': company_id, 'business_type': entry['segment']})
             self.company_positions(company_id, ['ADMIN', 'MANAGER', 'SUPPORT'])
             admin_id, _, _ = self.user(f'{key}:admin', 'users/pfp/suitman', company_id, 'ADMIN')
             self.company_admin[company_id] = admin_id
@@ -275,13 +275,13 @@ class Builder:
         unit_id = uid('unit', key, index)
         address_id = self.address(city_key, f'unit:{key}:{index}', uid('company', key))
         self.add('local_unit', {
-            'id': unit_id, 'fk_requester': requester_id, 'fk_address': address_id,
+            'id': unit_id, 'requester_id': requester_id, 'address_id': address_id,
             'complement': f'Unidade {index + 1} - {self.cities[city_key]["name"]}', 'location_type': entry['location_type'],
         })
         low, high = entry['kwh']
         kwh = self.rng.randrange(low, high, 100)
-        self.add('unit_specifications', {
-            'id': uid('unit_spec', key, index), 'fk_local_unit': unit_id,
+        self.add('unit_specification', {
+            'id': uid('unit_spec', key, index), 'local_unit_id': unit_id,
             'specifications': (f'Consumo medio mensal {kwh} kWh; area de cobertura {self.rng.randrange(400, 6000, 50)} m2; '
                                f'tarifa {self.rng.choice(["B3", "A4", "B1"])}; padrao {self.rng.choice(["monofasico", "bifasico", "trifasico"])}')[:255],
             'location_photos': None, 'date': self.when(-self.rng.randint(5, 200)),
@@ -290,13 +290,14 @@ class Builder:
             image = self.pool.unique(f'units/{segment}/{kind}')
             if image:
                 self.add('local_unit_photo', {
-                    'id': uid('unit_photo', key, index, kind), 'fk_local_unit': unit_id, 'type': kind.upper(),
+                    'id': uid('unit_photo', key, index, kind), 'local_unit_id': unit_id,
+                    'type': 'BANNER' if kind == 'banner' else 'GALLERY', 'is_primary': kind == 'main',
                     'url': self.pool.url(image), 'public_id': self.pool.public_id(image), 'created_at': self.when(-15),
                 })
         for position, image in enumerate(self.pool.sample(f'units/{segment}/gallery', 4, self.rng)):
             self.add('local_unit_photo', {
-                'id': uid('unit_photo', key, index, 'gallery', position), 'fk_local_unit': unit_id, 'type': 'GALLERY',
-                'url': self.pool.url(image), 'public_id': self.pool.public_id(image), 'created_at': self.when(-15),
+                'id': uid('unit_photo', key, index, 'gallery', position), 'local_unit_id': unit_id, 'type': 'GALLERY',
+                'is_primary': False, 'url': self.pool.url(image), 'public_id': self.pool.public_id(image), 'created_at': self.when(-15),
             })
         return unit_id
 
@@ -307,13 +308,13 @@ class Builder:
             company_id = self.company(key, entry['name'], 'SUPPLIER', entry['city'], entry['banner_theme'])
             supplier_id = uid('supplier', key)
             self.add('supplier', {
-                'id': supplier_id, 'fk_company': company_id, 'status': 'ACTIVE', 'business_type': entry['business_type'],
+                'id': supplier_id, 'company_id': company_id, 'status': 'ACTIVE', 'business_type': entry['business_type'],
             })
             expired = entry['subscription'] == 'expired'
             self.add('subscription', {
-                'id': uid('subscription', key), 'fk_supplier': supplier_id, 'fk_plan': Ref('company_plans', 'Pro'),
-                'status': 'IN_DEBT' if expired else 'PAID', 'auto_renewal': not expired,
-                'start_date': self.when(-120), 'end_date': self.when(-10 if expired else 245),
+                'id': uid('subscription', key), 'supplier_id': supplier_id, 'company_plan_id': Ref('company_plan', 'Pro'),
+                'status': 'IN_DEBT' if expired else 'PAID', 'has_auto_renewal': not expired,
+                'starts_at': self.when(-120), 'ends_at': self.when(-10 if expired else 245),
             })
             self.company_positions(company_id, ['ADMIN', 'MANAGER', 'SALES'])
             self.user(f'{key}:admin', 'users/pfp/suitman', company_id, 'ADMIN')
@@ -327,9 +328,9 @@ class Builder:
             key = entry['key']
             company_id = self.company(key, entry['name'], 'SUPPLIER', entry['city'], entry['banner_theme'])
             self.add('supplier', {
-                'id': uid('supplier', key), 'fk_company': company_id, 'status': 'ACTIVE', 'business_type': 'INSTALADORA',
+                'id': uid('supplier', key), 'company_id': company_id, 'status': 'ACTIVE', 'business_type': 'INSTALADORA',
             })
-            self.add('technical_company', {'id': uid('technical_company', key), 'fk_company': company_id})
+            self.add('technical_company', {'id': uid('technical_company', key), 'company_id': company_id})
             self.company_positions(company_id, ['ADMIN', 'MANAGER', 'TECHNICIAN', 'SUPPORT'])
             self.user(f'{key}:admin', 'users/pfp/suitman', company_id, 'ADMIN')
             self.user(f'{key}:manager', 'users/pfp/staff', company_id, 'MANAGER')
@@ -339,7 +340,7 @@ class Builder:
     def build_platform_admins(self):
         for index in range(self.plan['platform_admins']):
             user_id, _, _ = self.user(f'platform-admin:{index}', 'users/pfp/staff')
-            self.add('platform_admin', {'id': uid('platform_admin', index), 'fk_user': user_id, 'created_at': self.when(-90)})
+            self.add('platform_admin', {'id': uid('platform_admin', index), 'user_id': user_id, 'created_at': self.when(-90)})
 
     def build_dev_accounts(self):
         # Contas fixas (uma por cargo) para entrar no web sem procurar nomes aleatorios. Criadas no fim do build
@@ -355,7 +356,7 @@ class Builder:
                 self.dev_users.setdefault(company_id, {})[position] = user_id
         if self.plan.get('dev_platform_admin'):
             user_id, _, _ = self.user('dev:platform-admin', 'users/pfp/staff', username=self.plan['dev_platform_admin'])
-            self.add('platform_admin', {'id': uid('platform_admin', 'dev'), 'fk_user': user_id, 'created_at': self.when(-90)})
+            self.add('platform_admin', {'id': uid('platform_admin', 'dev'), 'user_id': user_id, 'created_at': self.when(-90)})
 
     def build_test_account(self):
         account = self.plan.get('dev_test_account')
@@ -366,31 +367,24 @@ class Builder:
         username = account['username']
         user_id = self.dev_technician(technical['company'], uid('company', technical['company']), username)
         auth_id = uid('auth', f'dev:{username}')
-        next(row for row in self.data.core['users'] if row['id'] == user_id)['managed_by_company_id'] = None
+        next(row for row in self.data.core['user_account'] if row['id'] == user_id)['managed_by_company_id'] = None
         next(row for row in self.data.auth['auth_user'] if row['id'] == auth_id)['primary_email'] = account['email']
-        next(row for row in self.data.auth['local_credential'] if row['user_id'] == auth_id)['password_hash'] = account['password_hash']
-        next(row for row in self.data.core['user_company'] if row['fk_users'] == user_id)['fk_position'] = self.positions['ADMIN']
-        for group in groups:
-            if group['company'] != technical['company']:
-                self.add('user_company', {
-                    'id': uid('user_company', f'dev:{username}', group['company']),
-                    'fk_company': uid('company', group['company']), 'fk_users': user_id,
-                    'fk_position': self.positions['ADMIN'],
-                })
-        self.add('platform_admin', {'id': uid('platform_admin', 'dev-test'), 'fk_user': user_id, 'created_at': self.when(-90)})
+        next(row for row in self.data.auth['local_credential'] if row['auth_user_id'] == auth_id)['password_hash'] = account['password_hash']
+        next(row for row in self.data.core['user_company'] if row['user_id'] == user_id)['job_position_id'] = self.positions['ADMIN']
+        self.add('platform_admin', {'id': uid('platform_admin', 'dev-test'), 'user_id': user_id, 'created_at': self.when(-90)})
         for project in self.data.core['technical_project']:
             self.add('project_member', {
-                'id': uid('project_member', project['id'], user_id), 'project_id': project['id'],
+                'id': uid('project_member', project['id'], user_id), 'technical_project_id': project['id'],
                 'user_id': user_id, 'role': 'MANAGER', 'function_name': 'Responsável de teste',
-                'active': True, 'joined_at': self.when(-20),
+                'is_active': True, 'joined_at': self.when(-20),
             })
 
     def approved_onboarding(self, user_id, technician_id, council, number, expiration):
         """Perfil de onboarding aprovado: é o que o login mobile exige de um profissional (api-core, `eligibility`).
         Não sorteia nada, então os demais dados do seed não mudam. `professionId` fica nulo porque a profissão só é
         resolvida (por nome) na hora de gravar; a profissão do técnico está em `professional_registration`."""
-        person = next(row for row in reversed(self.data.core['person']) if row['fk_users'] == user_id)
-        user = next(row for row in reversed(self.data.core['users']) if row['id'] == user_id)
+        person = next(row for row in reversed(self.data.core['person']) if row['user_id'] == user_id)
+        user = next(row for row in reversed(self.data.core['user_account']) if row['id'] == user_id)
         draft = json.dumps({
             'revision': 1, 'name': person['name'], 'cpf': person['cpf'], 'birthDate': person['birth_date'].isoformat(),
             'email': f"{user['username']}@{self.domain}", 'phone': None, 'professionId': None,
@@ -400,7 +394,7 @@ class Builder:
         self.add('professional_onboarding', {
             'id': uid('professional_onboarding', technician_id), 'auth_id': user['auth_id'], 'user_id': user_id,
             'technician_id': technician_id, 'revision': 1, 'approved_version': 1,
-            'draft_json': draft, 'approved_json': draft, 'suspended': False,
+            'draft_json': draft, 'approved_json': draft, 'is_suspended': False,
         })
 
     def dev_technician(self, company_key, company_id, username):
@@ -409,16 +403,16 @@ class Builder:
         registration_id = uid('registration', 'dev', username)
         profession = next(iter(self.plan['technicians']['professions']))
         self.add('technician', {
-            'id': technician_id, 'fk_person': person_id, 'crea': 'CREA-SP 100001', 'slug': f'{slugify(name)}-dev', 'status': 'APPROVED',
+            'id': technician_id, 'person_id': person_id, 'crea': 'CREA-SP 100001', 'slug': f'{slugify(name)}-dev', 'status': 'APPROVED',
         })
         self.add('professional_registration', {
-            'id': registration_id, 'fk_technician': technician_id, 'fk_profession': Ref('profession', profession),
-            'council': 'CREA-SP', 'number': '100001', 'expiration_date': self.when(720).replace(tzinfo=None),
+            'id': registration_id, 'technician_id': technician_id, 'profession_id': Ref('profession', profession),
+            'council': 'CREA-SP', 'number': '100001', 'expires_at': self.when(720),
         })
         self.approved_onboarding(user_id, technician_id, 'CREA-SP', '100001', self.when(720))
         self.add('technician_affiliation', {
-            'id': uid('affiliation', 'dev', username), 'fk_company': company_id, 'fk_technician': technician_id,
-            'affiliation_type': 'AFFILIATED', 'active': True,
+            'id': uid('affiliation', 'dev', username), 'company_id': company_id, 'technician_id': technician_id,
+            'affiliation_type': 'AFFILIATED', 'is_active': True,
         })
         return user_id
 
@@ -434,10 +428,10 @@ class Builder:
         affiliation_user = {item['affiliation']: item['user'] for item in self.technicians}
         executors = {}
         for row in core['service_executor']:
-            executors.setdefault(row['fk_service'], []).append(row)
+            executors.setdefault(row['technical_service_id'], []).append(row)
         services = {}
         for row in core['technical_service']:
-            services.setdefault(row['fk_technical_project'], []).append(row)
+            services.setdefault(row['technical_project_id'], []).append(row)
 
         # a conta de técnico de desenvolvimento participa de alguns projetos, para a visão do técnico não ficar vazia
         dev_technician = next((users['TECHNICIAN'] for users in self.dev_users.values() if 'TECHNICIAN' in users), None)
@@ -448,21 +442,21 @@ class Builder:
             company_id = project['owner_company_id']
             admin_id = self.company_admin[company_id]
             segment = self.units_by_company[company_id]['segment']
-            address = addresses[units[project['fk_local_unit']]['fk_address']]
+            address = addresses[units[project['local_unit_id']]['address_id']]
             trade_name = companies[company_id]['trade_name']
-            rows = sorted(services.get(project_id, []), key=lambda row: row['scheduled_date'])
+            rows = sorted(services.get(project_id, []), key=lambda row: row['scheduled_at'])
             status = project_status([row['status'] for row in rows])
-            start = project['start_date']
+            start = project['starts_at']
             kind = rng.choice(PROJECT_KINDS)
-            ends = [row['end_date'] for row in rows if row['end_date']]
+            ends = [row['ends_at'] for row in rows if row['ends_at']]
             project.update({
                 'name': f"{kind} - {trade_name} ({address['city']})"[:160],
                 'description': (f"{kind} na unidade de {segment} em {address['city']}/{address['state']}. "
                                 f"{rng.choice(PROJECT_SCOPES)}"),
                 'status': status,
-                'end_date': max(ends).replace(tzinfo=None) if status == 'COMPLETED' and ends else None,
-                'created_by': admin_id,
-                'archived': status == 'COMPLETED' and rng.random() < 0.25,
+                'ends_at': max(ends) if status == 'COMPLETED' and ends else None,
+                'created_by_user_id': admin_id,
+                'is_archived': status == 'COMPLETED' and rng.random() < 0.25,
                 'created_at': start,
                 'location_state': address['state'], 'location_city': address['city'],
                 'location_neighborhood': address['neighborhood'], 'location_zip_code': address['zip_code'],
@@ -480,48 +474,48 @@ class Builder:
                 members.setdefault(staff['SUPPORT'], ('VIEWER', 'Acompanhamento'))
             for row in rows:
                 for executor in executors.get(row['id'], []):
-                    user_id = affiliation_user.get(executor['fk_technician_affiliation'])
+                    user_id = affiliation_user.get(executor['technician_affiliation_id'])
                     if user_id:
                         members.setdefault(user_id, ('MEMBER', executor['function']))
             if project_id in dev_projects:
                 members.setdefault(dev_technician, ('MEMBER', 'Técnico de campo'))
             for user_id, (role, function) in members.items():
                 self.add('project_member', {
-                    'id': uid('project_member', project_id, user_id), 'project_id': project_id, 'user_id': user_id,
-                    'role': role, 'function_name': function, 'active': True, 'joined_at': start,
+                    'id': uid('project_member', project_id, user_id), 'technical_project_id': project_id, 'user_id': user_id,
+                    'role': role, 'function_name': function, 'is_active': True, 'joined_at': start,
                 })
 
             self.add('project_history', {
-                'id': uid('project_history', project_id, 'created'), 'project_id': project_id, 'actor_id': admin_id,
+                'id': uid('project_history', project_id, 'created'), 'technical_project_id': project_id, 'actor_user_id': admin_id,
                 'action': 'CREATED', 'detail': 'Projeto criado', 'created_at': start,
             })
             self.add('project_activity', {
-                'id': uid('project_activity', project_id, 'kickoff'), 'project_id': project_id,
+                'id': uid('project_activity', project_id, 'kickoff'), 'technical_project_id': project_id,
                 'title': 'Reunião de alinhamento do projeto', 'description': 'Alinhamento de escopo, prazos e responsáveis.',
                 'type': 'MEETING', 'status': 'COMPLETED', 'starts_at': start + timedelta(days=1),
-                'ends_at': start + timedelta(days=1, hours=1), 'onsite': False,
-                'assignee_ids': '{' + str(admin_id) + '}', 'technical_service_id': None,
+                'ends_at': start + timedelta(days=1, hours=1), 'is_onsite': False,
+                'assignee_user_ids': '{' + str(admin_id) + '}', 'technical_service_id': None,
             })
             for row in rows:
-                assignees = [affiliation_user[e['fk_technician_affiliation']] for e in executors.get(row['id'], [])
-                             if e['fk_technician_affiliation'] in affiliation_user]
+                assignees = [affiliation_user[e['technician_affiliation_id']] for e in executors.get(row['id'], [])
+                             if e['technician_affiliation_id'] in affiliation_user]
                 self.add('project_activity', {
-                    'id': uid('project_activity', row['id']), 'project_id': project_id, 'title': row['purpose'][:160],
-                    'description': None, 'type': 'SERVICE', 'status': row['status'], 'starts_at': row['scheduled_date'],
+                    'id': uid('project_activity', row['id']), 'technical_project_id': project_id, 'title': row['purpose'][:160],
+                    'description': None, 'type': 'SERVICE', 'status': row['status'], 'starts_at': row['scheduled_at'],
                     # o banco exige ends_at > starts_at; no plano o fim do servico pode cair antes do agendamento
-                    'ends_at': max(row['end_date'], row['scheduled_date'] + timedelta(hours=2)) if row['end_date'] else None,
-                    'onsite': True, 'assignee_ids': '{' + ','.join(str(a) for a in assignees) + '}',
+                    'ends_at': max(row['ends_at'], row['scheduled_at'] + timedelta(hours=2)) if row['ends_at'] else None,
+                    'is_onsite': True, 'assignee_user_ids': '{' + ','.join(str(a) for a in assignees) + '}',
                     'technical_service_id': row['id'],
                 })
                 if row['status'] != 'OPEN':
                     self.add('project_history', {
-                        'id': uid('project_history', row['id']), 'project_id': project_id, 'actor_id': admin_id,
+                        'id': uid('project_history', row['id']), 'technical_project_id': project_id, 'actor_user_id': admin_id,
                         'action': 'ACTIVITY_STATUS', 'detail': f"{row['purpose'][:120]} → {row['status']}",
-                        'created_at': row['end_date'] or row['scheduled_date'],
+                        'created_at': row['ends_at'] or row['scheduled_at'],
                     })
             if status != 'OPEN':
                 self.add('project_history', {
-                    'id': uid('project_history', project_id, 'status'), 'project_id': project_id, 'actor_id': admin_id,
+                    'id': uid('project_history', project_id, 'status'), 'technical_project_id': project_id, 'actor_user_id': admin_id,
                     'action': 'STATUS', 'detail': f'OPEN → {status}', 'created_at': start + timedelta(days=2),
                 })
             self.project_photos(rng, project_id, admin_id, segment, start)
@@ -543,11 +537,11 @@ class Builder:
             cover = position == 1
             created = start + timedelta(days=3 + position)
             self.add('project_photo', {
-                'id': uid('project_photo', project_id, image), 'project_id': project_id, 'name': f'foto-{position:02d}.jpg',
-                'mime': 'image/jpeg', 'content': content, 'cover': cover, 'uploaded_by': admin_id, 'created_at': created,
+                'id': uid('project_photo', project_id, image), 'technical_project_id': project_id, 'name': f'foto-{position:02d}.jpg',
+                'mime': 'image/jpeg', 'content': content, 'is_primary': cover, 'uploaded_by_user_id': admin_id, 'created_at': created,
             })
             self.add('project_history', {
-                'id': uid('project_history', project_id, image), 'project_id': project_id, 'actor_id': admin_id,
+                'id': uid('project_history', project_id, image), 'technical_project_id': project_id, 'actor_user_id': admin_id,
                 'action': 'COVER_CHANGED' if cover else 'PHOTO_ADDED', 'detail': 'Capa atualizada' if cover else 'Foto adicionada',
                 'created_at': created,
             })
@@ -556,8 +550,8 @@ class Builder:
     def brand(self, name, owner_company_id=None):
         brand_id = uid('brand', name)
         self.add('brand', {
-            'id': brand_id, 'fk_owner_company': owner_company_id, 'name': name, 'normalized_name': name.lower(),
-            'visibility': 'PUBLIC', 'archived': False, 'legacy': False, 'logo_url': None, 'reference_url': None,
+            'id': brand_id, 'owner_company_id': owner_company_id, 'name': name, 'normalized_name': name.lower(),
+            'visibility': 'PUBLIC', 'is_archived': False, 'is_legacy': False, 'logo_url': None, 'reference_url': None,
         })
         return brand_id
 
@@ -566,7 +560,7 @@ class Builder:
         primary = picker(primary_pool)
         if primary:
             self.add('model_photo', {
-                'id': uid('model_photo', key, 'primary'), 'fk_model': model_id, 'url': self.pool.url(primary),
+                'id': uid('model_photo', key, 'primary'), 'model_id': model_id, 'url': self.pool.url(primary),
                 'public_id': self.pool.public_id(primary), 'is_primary': True, 'created_at': self.when(-20),
             })
         if unique:
@@ -575,7 +569,7 @@ class Builder:
             gallery = self.pool.sample(gallery_pool, gallery_count, self.rng)
         for position, image in enumerate(gallery):
             self.add('model_photo', {
-                'id': uid('model_photo', key, 'gallery', position), 'fk_model': model_id, 'url': self.pool.url(image),
+                'id': uid('model_photo', key, 'gallery', position), 'model_id': model_id, 'url': self.pool.url(image),
                 'public_id': self.pool.public_id(image), 'is_primary': False, 'created_at': self.when(-20, hours=position),
             })
 
@@ -601,11 +595,11 @@ class Builder:
             status = next(status_iter) if index in status_slots else 'APPROVED'
             creator = self.rng.choice(self.suppliers)['company_id']
             self.add('model', {
-                'id': model_id, 'fk_brand': brand_id, 'model': name, 'power_wp': power,
+                'id': model_id, 'brand_id': brand_id, 'model_name': name, 'power_wp': power,
                 'efficiency': round(self.rng.uniform(*family['efficiency']), 1), 'dimension': None, 'type': family['type'],
                 'width': width, 'length': round(area / width, 3), 'weight': round(self.rng.uniform(*family['weight']), 1),
                 'status': status, 'product_type': 'PANEL', 'infrastructure_type': None, 'material': None,
-                'fk_creator_company': creator,
+                'creator_company_id': creator,
             })
             self.photos_for_model(name, model_id, 'products/solar-panels/hero', 'products/solar-panels/demo', 3, unique=False)
             models.append({'id': model_id, 'name': name, 'brand': brand_name, 'power': power, 'type': family['type']})
@@ -616,14 +610,14 @@ class Builder:
     def offer_row(self, supplier, model_id, title, description, price, availability, slug, expired=False, paused=False, no_stock=False):
         offer_id = uid('offer', supplier['key'], slug)
         self.add('offer', {
-            'id': offer_id, 'fk_supplier': supplier['supplier_id'], 'fk_model': model_id, 'unit_price': price,
-            'availability': availability, 'expiration_date': self.when(-5) if expired else self.when(self.rng.randint(60, 400)),
+            'id': offer_id, 'supplier_id': supplier['supplier_id'], 'model_id': model_id, 'unit_price': price,
+            'availability': availability, 'expires_at': self.when(-5) if expired else self.when(self.rng.randint(60, 400)),
             'slug': f'{supplier["key"]}-{slug}'[:160],
             'discount_percentage': self.rng.choice([None, None, 3, 5, 8, 10, 15]), 'source_locale': 'pt-BR',
             'translation_status': 'COMPLETED', 'commercial_status': 'PAUSED' if paused else 'ACTIVE',
         })
         self.add('inventory', {
-            'id': uid('inventory', supplier['key'], slug), 'fk_supplier': supplier['supplier_id'], 'fk_model': model_id,
+            'id': uid('inventory', supplier['key'], slug), 'supplier_id': supplier['supplier_id'], 'model_id': model_id,
             'quantity': 0 if no_stock else int(availability * self.rng.uniform(1.0, 2.0)),
         })
         for locale, (loc_title, loc_description) in {
@@ -632,7 +626,7 @@ class Builder:
             'es-ES': (title, f'Oferta {title} de {supplier["name"]}. Datos de ejemplo.'),
         }.items():
             self.add('offer_translation', {
-                'id': uid('offer_translation', offer_id, locale), 'fk_offer': offer_id, 'locale': locale,
+                'id': uid('offer_translation', offer_id, locale), 'offer_id': offer_id, 'locale': locale,
                 'title': loc_title[:160], 'description': loc_description, 'details': None,
             })
         self.offers.append({'id': offer_id, 'supplier_key': supplier['key'], 'supplier_id': supplier['supplier_id'], 'price': price, 'paused': paused,
@@ -666,10 +660,10 @@ class Builder:
         for index, product in enumerate(infra['products']):
             model_id = uid('model', 'infra', product['name'])
             self.add('model', {
-                'id': model_id, 'fk_brand': infra_brands[product['brand']], 'model': product['name'], 'power_wp': None,
+                'id': model_id, 'brand_id': infra_brands[product['brand']], 'model_name': product['name'], 'power_wp': None,
                 'efficiency': None, 'dimension': None, 'type': None, 'width': None, 'length': None, 'weight': None,
                 'status': 'APPROVED', 'product_type': 'INFRASTRUCTURE', 'infrastructure_type': product['type'],
-                'material': product['material'], 'fk_creator_company': self.rng.choice(sellers)['company_id'],
+                'material': product['material'], 'creator_company_id': self.rng.choice(sellers)['company_id'],
             })
             self.photos_for_model(f'infra:{product["name"]}', model_id, 'products/infrastructure/hero',
                                   'products/infrastructure/gallery', 2, unique=True)
@@ -700,15 +694,15 @@ class Builder:
             council = self.rng.choice(COUNCILS)
             number = str(self.rng.randint(100000, 999999))
             self.add('technician', {
-                'id': technician_id, 'fk_person': person_id, 'crea': f'{council} {number}',
+                'id': technician_id, 'person_id': person_id, 'crea': f'{council} {number}',
                 'slug': f'{slugify(name)}-{index}', 'status': statuses[index],
             })
             registration_id = uid('registration', index)
             expired = self.rng.random() < plan['expired_registration_ratio']
             self.add('professional_registration', {
-                'id': registration_id, 'fk_technician': technician_id, 'fk_profession': Ref('profession', profession),
+                'id': registration_id, 'technician_id': technician_id, 'profession_id': Ref('profession', profession),
                 'council': council, 'number': number,
-                'expiration_date': (self.when(-self.rng.randint(10, 300)) if expired else self.when(self.rng.randint(90, 900))).replace(tzinfo=None),
+                'expires_at': (self.when(-self.rng.randint(10, 300)) if expired else self.when(self.rng.randint(90, 900))),
             })
             if statuses[index] == 'APPROVED':
                 self.approved_onboarding(user_id, technician_id, council, number, self.when(720))
@@ -716,20 +710,20 @@ class Builder:
                 cert_id = uid('certification', index, cert_index)
                 cert_name = self.rng.choice(cert_names)
                 self.add('certification', {
-                    'id': cert_id, 'fk_technician': technician_id, 'type': cert_name.split(' ')[0],
+                    'id': cert_id, 'technician_id': technician_id, 'type': cert_name.split(' ')[0],
                     'information': self.rng.choice(cert_descriptions), 'image': None,
                     'description': self.rng.choice(cert_descriptions), 'issuer': 'Entidade certificadora ficticia',
                     'name': cert_name[:100],
-                    'validity': (self.when(self.rng.randint(-120, 700))).replace(tzinfo=None),
+                    'valid_until_at': self.when(self.rng.randint(-120, 700)),
                 })
                 self.add('certification_record', {
-                    'id': uid('certification_record', index, cert_index), 'fk_professional_registration': registration_id,
-                    'fk_certification': cert_id,
+                    'id': uid('certification_record', index, cert_index), 'professional_registration_id': registration_id,
+                    'certification_id': cert_id,
                 })
             affiliation_id = uid('affiliation', index)
             self.add('technician_affiliation', {
-                'id': affiliation_id, 'fk_company': company['company_id'], 'fk_technician': technician_id,
-                'affiliation_type': self.rng.choices(['AFFILIATED', 'PARTNER', 'INDEPENDENT'], [60, 25, 15])[0], 'active': True,
+                'id': affiliation_id, 'company_id': company['company_id'], 'technician_id': technician_id,
+                'affiliation_type': self.rng.choices(['AFFILIATED', 'PARTNER', 'INDEPENDENT'], [60, 25, 15])[0], 'is_active': True,
             })
             self.technicians.append({'id': technician_id, 'affiliation': affiliation_id, 'user': user_id})
 
@@ -758,21 +752,21 @@ class Builder:
                 item_id = uid('proposal_item', index, item_index)
                 item_rows.append((item_id, quantity))
                 self.add('proposal_item', {
-                    'id': item_id, 'fk_proposal': proposal_id, 'fk_offer': offer['id'], 'quantity': quantity,
-                    'negotiated_price': negotiated, 'discount': discount if negotiated else None,
+                    'id': item_id, 'proposal_id': proposal_id, 'offer_id': offer['id'], 'quantity': quantity,
+                    'negotiated_unit_price': negotiated, 'discount': discount if negotiated else None,
                 })
             self.add('proposal', {
-                'id': proposal_id, 'fk_requester': info['requester'], 'fk_supplier': supplier_id, 'status': status,
+                'id': proposal_id, 'requester_id': info['requester'], 'supplier_id': supplier_id, 'status': status,
                 'notes': 'Proposta gerada pelo seed planejado.', 'total_amount': round(total, 2),
-                'created_at': self.when(-self.rng.randint(3, 160)), 'updated_at': None,
+                'created_at': self.when(-self.rng.randint(3, 160)),
             })
             for item_id, quantity in item_rows:
                 units = self.rng.sample(info['units'], min(len(info['units']), self.rng.randint(1, 3)))
                 share = max(1, quantity // len(units))
                 for unit_index, unit_id in enumerate(units):
                     self.add('proposal_unit', {
-                        'id': uid('proposal_unit', item_id, unit_index), 'fk_proposal_item': item_id,
-                        'fk_local_unit': unit_id, 'quantity': share, 'note': None,
+                        'id': uid('proposal_unit', item_id, unit_index), 'proposal_item_id': item_id,
+                        'local_unit_id': unit_id, 'quantity': share, 'note': None,
                     })
 
     # ---------- orders ----------
@@ -784,7 +778,7 @@ class Builder:
         rng = random.Random(f"{self.plan['rng_seed']}:orders")
         cents = Decimal('0.01')
         offer_rows = {row['id']: row for row in self.data.core['offer']}
-        model_names = {row['id']: row['model'] for row in self.data.core['model']}
+        model_names = {row['id']: row['model_name'] for row in self.data.core['model']}
         purchasable = [
             offer_rows[o['id']] for o in self.offers
             if not o['paused'] and not o['expired'] and offer_rows[o['id']]['availability'] > 0
@@ -796,18 +790,18 @@ class Builder:
         taken = Counter()
         fee_percentage = Decimal(str(plan['fee_percentage']))
 
-        supplier_by_company = {row['fk_company']: row['id'] for row in self.data.core['supplier']}
+        supplier_by_company = {row['company_id']: row['id'] for row in self.data.core['supplier']}
         own_suppliers = {}
         for membership in self.data.core['user_company']:
-            supplier_id = supplier_by_company.get(membership['fk_company'])
+            supplier_id = supplier_by_company.get(membership['company_id'])
             if supplier_id:
-                own_suppliers.setdefault(membership['fk_users'], set()).add(supplier_id)
+                own_suppliers.setdefault(membership['user_id'], set()).add(supplier_id)
 
         def lines(buyer_id, supplier_count, item_count):
             by_supplier = OrderedDict()
             for row in purchasable:
-                if row['fk_supplier'] not in own_suppliers.get(buyer_id, ()):
-                    by_supplier.setdefault(row['fk_supplier'], []).append(row)
+                if row['supplier_id'] not in own_suppliers.get(buyer_id, ()):
+                    by_supplier.setdefault(row['supplier_id'], []).append(row)
             chosen = rng.sample(list(by_supplier), min(supplier_count, len(by_supplier)))
             pool = [row for supplier in chosen for row in by_supplier[supplier]]
             return rng.sample(pool, min(item_count, len(pool)))
@@ -826,23 +820,23 @@ class Builder:
                 line_total = net * quantity
                 subtotal += line_total
                 self.add('order_item', {
-                    'id': uid('order_item', index, line_index), 'fk_order': order_id, 'fk_offer': offer['id'],
-                    'fk_supplier': offer['fk_supplier'], 'offer_slug': offer['slug'],
-                    'model_name': model_names[offer['fk_model']], 'unit_price': unit_price,
-                    'discount_percentage': discount, 'net_unit_price': net, 'quantity': quantity, 'line_total': line_total,
+                    'id': uid('order_item', index, line_index), 'purchase_order_id': order_id, 'offer_id': offer['id'],
+                    'supplier_id': offer['supplier_id'], 'offer_slug': offer['slug'],
+                    'model_name': model_names[offer['model_id']], 'unit_price': unit_price,
+                    'discount_percentage': discount, 'net_unit_price': net, 'quantity': quantity, 'line_total_amount': line_total,
                 })
                 if spec['status'] == 'PAID':
                     taken[offer['id']] += quantity
             fee = (subtotal * fee_percentage).quantize(cents, ROUND_HALF_UP)
             canceled = spec['status'] == 'CANCELED'
             self.add('purchase_order', {
-                'id': order_id, 'fk_buyer': buyer_id, 'status': spec['status'], 'subtotal': subtotal,
-                'fee_percentage': fee_percentage, 'fee_amount': fee, 'total': subtotal + fee, 'created_at': created_at,
+                'id': order_id, 'buyer_user_id': buyer_id, 'status': spec['status'], 'subtotal_amount': subtotal,
+                'fee_percentage': fee_percentage, 'fee_amount': fee, 'total_amount': subtotal + fee, 'created_at': created_at,
                 'canceled_at': created_at + timedelta(days=1) if canceled else None,
-                'canceled_by': buyer_id if canceled else None,
+                'canceled_by_user_id': buyer_id if canceled else None,
             })
             self.add('order_payment', {
-                'id': uid('order_payment', index), 'fk_order': order_id, 'method': spec['method'], 'amount': subtotal + fee,
+                'id': uid('order_payment', index), 'purchase_order_id': order_id, 'method': spec['method'], 'amount': subtotal + fee,
                 'status': 'REFUNDED' if canceled else 'PAID', 'paid_at': created_at,
                 'refunded_at': created_at + timedelta(days=1) if canceled else None,
             })
@@ -852,10 +846,10 @@ class Builder:
             kind = spec['buyer']
             buyer_id = buyers[kind][spec.get('buyer_index', index) % len(buyers[kind])]
             cart_id = uid('cart', index)
-            self.add('cart', {'id': cart_id, 'fk_users': buyer_id, 'created_at': self.when(-1), 'updated_at': self.when(-1)})
+            self.add('cart', {'id': cart_id, 'user_id': buyer_id, 'created_at': self.when(-1), 'updated_at': self.when(-1)})
             for line_index, offer in enumerate(lines(buyer_id, spec['suppliers'], spec['items'])):
                 self.add('cart_item', {
-                    'id': uid('cart_item', index, line_index), 'fk_cart': cart_id, 'fk_offer': offer['id'],
+                    'id': uid('cart_item', index, line_index), 'cart_id': cart_id, 'offer_id': offer['id'],
                     'quantity': rng.randint(1, 2), 'added_at': self.when(-1),
                 })
 
@@ -879,33 +873,33 @@ class Builder:
             if unit_id not in projects:
                 projects[unit_id] = uid('technical_project', unit_id)
                 self.add('technical_project', {
-                    'id': projects[unit_id], 'fk_requester': info['requester'], 'fk_local_unit': unit_id, 'owner_company_id': company_id,
-                    'status': 'OPEN', 'start_date': self.when(-self.rng.randint(30, 300)), 'end_date': None,
+                    'id': projects[unit_id], 'requester_id': info['requester'], 'local_unit_id': unit_id, 'owner_company_id': company_id,
+                    'status': 'OPEN', 'starts_at': self.when(-self.rng.randint(30, 300)), 'ends_at': None,
                 })
             status = self.rng.choices(status_names, status_weights)[0]
             created = self.when(-self.rng.randint(5, 240))
             service_id = uid('service', index)
             self.add('technical_service', {
-                'id': service_id, 'fk_technical_project': projects[unit_id], 'purpose': self.rng.choice(purposes)[:255],
-                'status': status, 'scheduled_date': created + timedelta(days=self.rng.randint(2, 30)), 'created_at': created,
-                'accepted_by': None, 'accepted_at': None,
-                'end_date': created + timedelta(days=self.rng.randint(3, 40)) if status == 'COMPLETED' else None,
+                'id': service_id, 'technical_project_id': projects[unit_id], 'purpose': self.rng.choice(purposes)[:255],
+                'status': status, 'scheduled_at': created + timedelta(days=self.rng.randint(2, 30)), 'created_at': created,
+                'accepted_by_user_id': None, 'accepted_at': None,
+                'ends_at': created + timedelta(days=self.rng.randint(3, 40)) if status == 'COMPLETED' else None,
             })
             executors = {order[self.rng.choices(range(len(order)), weights)[0]] for _ in range(self.rng.randint(1, 2))}
             for position, technician_index in enumerate(sorted(executors)):
                 technician = self.technicians[technician_index]
                 self.add('service_executor', {
-                    'id': uid('executor', index, position), 'fk_service': service_id,
-                    'fk_technician_affiliation': technician['affiliation'],
+                    'id': uid('executor', index, position), 'technical_service_id': service_id,
+                    'technician_affiliation_id': technician['affiliation'],
                     'function': 'Responsavel tecnico' if position == 0 else 'Auxiliar de instalacao',
                 })
                 if status == 'COMPLETED' and review_counts[technician_index] < self.plan['technicians']['max_reviews'] and self.rng.random() < 0.8:
                     review_counts[technician_index] += 1
                     rating = self.rng.choices([5.0, 4.5, 4.0, 3.5, 3.0, 2.0], [34, 24, 20, 10, 8, 4])[0]
                     self.add('professional_review', {
-                        'id': uid('review', index, position), 'fk_professional': technician['id'],
-                        'fk_reviewer': self.company_admin[company_id], 'fk_service': service_id, 'rating': rating,
-                        'comment': self.rng.choice(comments)[:255], 'active': True, 'created_at': created + timedelta(days=20),
+                        'id': uid('review', index, position), 'technician_id': technician['id'],
+                        'reviewer_user_id': self.company_admin[company_id], 'technical_service_id': service_id, 'rating': rating,
+                        'comment': self.rng.choice(comments)[:255], 'is_active': True, 'created_at': created + timedelta(days=20),
                     })
 
 

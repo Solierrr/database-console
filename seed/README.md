@@ -2,11 +2,11 @@
 
 População inicial determinística para ambientes **locais ou de desenvolvimento**: empresas clientes com várias unidades coerentes com o ramo, fornecedores, catálogo de placas e de infraestrutura, técnicos, serviços, propostas e usuários com login. Serve ao desenvolvimento do web e ao `api-recommendation` (casos de borda propositais).
 
-Não substitui `db/core/seed.sql` (mínimo) nem `scripts/dataload.py` (volume aleatório).
+Não substitui `scripts/dataload.py` (volume aleatório). Usa os nomes finais do baseline do `api-core` e do `api-auth` (`user_account`, `*_id`, `is_*`, `timestamptz`).
 
 ## Como rodar
 
-Requisitos: Python com `psycopg2-binary`, `PyYAML` e `python-dotenv` (`scripts/requirements.txt`), o schema aplicado (`make migrate` ou `make schema`) nos dois bancos e o `mocks-warehouse` ao lado deste repositório.
+Requisitos: Python com `psycopg2-binary`, `PyYAML` e `python-dotenv` (`scripts/requirements.txt`), o schema criado pelo Flyway do `api-core` e do `api-auth` nos dois bancos e o `mocks-warehouse` ao lado deste repositório.
 
 ```sh
 # 1) ver o que será criado e o que falta de imagens, sem tocar no banco
@@ -35,9 +35,9 @@ O QA aceita o seed só com uma senha própria: defina `ENVIRONMENT=qa` e `SEED_P
 
 `test@test.dev` / `Batata123` pode ser criada ou atualizada nos dois ambientes com uma carga específica. Extraia as credenciais do ambiente desejado com `make vault ENV=qa` ou `make vault ENV=prod` e execute `python -m seed.test_account`. Para usar outro arquivo de credenciais, passe `--env-file CAMINHO`.
 
-Esse comando grava apenas a identidade em `auth_user`, a senha bcrypt em `local_credential` e o usuário vinculado em `users`. A repetição atualiza a senha e reativa a mesma conta, sem duplicá-la. A conta não recebe cargos de empresa nem administração da plataforma. A carga completa de dados fictícios continua com as restrições de ambiente descritas acima. Auth e core usam transações separadas; em caso de falha entre os commits, execute o comando novamente para reconciliar a conta.
+Esse comando grava apenas a identidade em `auth_user`, a senha bcrypt em `local_credential` e o usuário vinculado em `user_account`. A repetição atualiza a senha e reativa a mesma conta, sem duplicá-la. A conta não recebe cargos de empresa nem administração da plataforma. A carga completa de dados fictícios continua com as restrições de ambiente descritas acima. Auth e core usam transações separadas; em caso de falha entre os commits, execute o comando novamente para reconciliar a conta.
 
-Todos os usuários criados usam a mesma senha simples, `Batata123`, só para desenvolvimento e QA de teste. O e-mail de cada um é `<username>@solaria.dev`. Para listar: `SELECT username FROM users` no `coredb`.
+Todos os usuários criados usam a mesma senha simples, `Batata123`, só para desenvolvimento e QA de teste. O e-mail de cada um é `<username>@solaria.dev`. Para listar: `SELECT username FROM user_account` no `coredb`.
 
 ### Contas fixas por cargo
 
@@ -83,7 +83,7 @@ Casos de borda para testar filtros: modelos em análise e reprovados, ofertas ex
 
 ### Conta única para testar a interface
 
-`teste@teste` / `Batata123` é uma conta exclusiva do seed local: profissional, administradora da plataforma e ADMIN nas empresas Rede Aurora Hoteis, SolMax Distribuidora e Raio de Sol. Possui participação de gestão nos projetos do seed. As contas por cargo permanecem disponíveis para testar permissões mais restritas. A conta é criada no fim do build sem alterar IDs ou dados das contas existentes. A carga incremental não exige reset.
+`teste@teste` / `Batata123` é uma conta exclusiva do seed local: profissional, administradora da plataforma e ADMIN na empresa Raio de Sol (o baseline permite um vínculo de empresa por usuário). Possui participação de gestão nos projetos do seed. As contas por cargo permanecem disponíveis para testar permissões mais restritas. A conta é criada no fim do build sem alterar IDs ou dados das contas existentes. A carga incremental não exige reset.
 
 ## Compras de demonstração
 

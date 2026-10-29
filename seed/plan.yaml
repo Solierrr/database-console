@@ -182,7 +182,7 @@ position_permissions:
     - GET /api/local-units/company/{companyId}
     - GET /api/requesters/company/{companyId}
     - GET /api/suppliers/company/{companyId}
-    - POST /api/geolocalizations
+    - POST /api/geolocations
     - POST /api/access-codes
     - GET /api/access-codes/company/{companyId}
     - DELETE /api/access-codes/{id}/company/{companyId}
