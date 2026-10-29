@@ -148,12 +148,24 @@ def has_privilege(cursor, query, *arguments):
     return cursor.fetchone()[0]
 
 
-def check_write_privileges(cursor, name, role, label, allowed, expected):
+def table_privileges(cursor, role, label):
+    """Os privilégios de tabela do papel em uma só consulta (uma ida ao banco por tabela, não uma por privilégio)."""
+    cursor.execute('SELECT p, has_table_privilege(%s, %s, p) FROM unnest(%s::text[]) AS p', (role, label, list(TABLE_PRIVILEGES)))
+    return dict(cursor.fetchall())
+
+
+def column_privileges(cursor, role, label, columns):
+    """O SELECT do papel em cada coluna em uma só consulta."""
+    cursor.execute("SELECT c, has_column_privilege(%s, %s, c, 'SELECT') FROM unnest(%s::text[]) AS c", (role, label, list(columns)))
+    return dict(cursor.fetchall())
+
+
+def check_write_privileges(name, role, label, held, allowed, expected):
     problems = []
     for privilege in TABLE_PRIVILEGES:
         if privilege == 'SELECT':
             continue
-        has = has_privilege(cursor, 'SELECT has_table_privilege(%s, %s, %s)', role, label, privilege)
+        has = held[privilege]
         wanted = privilege in allowed and expected is None
         if has and not wanted:
             problems.append(f'{name}: {role} tem {privilege} em {label}')
@@ -162,15 +174,15 @@ def check_write_privileges(cursor, name, role, label, allowed, expected):
     return problems
 
 
-def check_read_privileges(cursor, name, role, label, columns, expected):
-    table_wide = has_privilege(cursor, 'SELECT has_table_privilege(%s, %s, %s)', role, label, 'SELECT')
+def check_read_privileges(cursor, name, role, label, columns, table_wide, expected):
     if expected is None:
         return [] if table_wide else [f'{name}: {role} não lê {label}']
     problems = []
     if table_wide:
         problems.append(f'{name}: {role} lê {label} inteira, mas o contrato libera só {expected or "nada"}')
+    readable_columns = column_privileges(cursor, role, label, columns)
     for column in columns:
-        readable = has_privilege(cursor, 'SELECT has_column_privilege(%s, %s, %s, %s)', role, label, column, 'SELECT') and not table_wide
+        readable = readable_columns[column] and not table_wide
         if readable and column not in expected:
             problems.append(f'{name}: {role} lê {label}.{column}, que não está no contrato')
         if not readable and column in expected:
@@ -183,8 +195,9 @@ def check_schema(cursor, name, role, schema, existing, expected_grants, allowed)
     for table, columns in existing.items():
         label = f'{schema}.{table}'
         expected = expected_grants.get(table, [])
-        problems += check_write_privileges(cursor, name, role, label, allowed, expected)
-        problems += check_read_privileges(cursor, name, role, label, columns, expected)
+        held = table_privileges(cursor, role, label)
+        problems += check_write_privileges(name, role, label, held, allowed, expected)
+        problems += check_read_privileges(cursor, name, role, label, columns, held['SELECT'], expected)
     if has_privilege(cursor, 'SELECT has_schema_privilege(%s, %s, %s)', role, schema, 'CREATE'):
         problems.append(f'{name}: {role} pode criar objetos no schema {schema}')
     return problems
