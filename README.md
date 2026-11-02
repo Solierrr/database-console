@@ -29,7 +29,6 @@ Os utilitários usam Python, clientes PostgreSQL e scripts de sistema. Uma compo
 - [SECRETS_AND_BACKUP.md](./docs/SECRETS_AND_BACKUP.md), detalhes do fluxo ou modelo de dados.
 - [Dados](./database/), modelos e responsabilidades de persistência.
 - [Fluxos](./flows/), etapas e casos de erro do repositório.
-- [PENDENCIAS.md](./PENDENCIAS.md), questões para revisão.
 
 ## Contribuindo
 
