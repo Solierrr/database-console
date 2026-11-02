@@ -16,7 +16,7 @@ de estrutura exige migração revisada; o exportador falha sem substituir dados.
 `gold.principal_access` e a função de autorização. A carga aplica
 Row Level Security forçado nas tabelas KPI. O registro começa vazio. A equipe
 de banco deve cadastrar logins verificados com `scope` `ADMIN`, `EXPORTER`,
-`SUPPLIER`, `REQUESTER` ou `PROFESSIONAL`, `entity_id` (identificador da
+`READER`, `SUPPLIER`, `REQUESTER` ou `PROFESSIONAL`, `entity_id` (identificador da
 entidade, ou `*` para ADMIN/EXPORTER), `validated_by` e `validated_at`.
 Um login de fornecedor, demandante ou profissional com mais de uma entidade
 ativa no mesmo escopo recebe zero linhas daquele escopo.
@@ -30,3 +30,13 @@ os logins devem ser associados à role separadamente.
 
 O AnalyticsDB é destino dos KPIs Gold. Ele não fornece a entrada Silver/Gold
 para o Databricks neste fluxo.
+
+## Leitor compartilhado do api-core
+
+O api-core lê com um único login (`solaria_ro_analytics`), cadastrado como `READER` com `entity_id` `*`.
+Cada requisição roda numa transação que chama `set_config('gold.scope', ..., true)` e
+`set_config('gold.entity_id', ..., true)`; `gold.can_read` só aceita esse contexto de um login `READER`.
+Sem contexto, ou com outro escopo ou entidade, o banco devolve zero linhas. Para o admin da plataforma o
+contexto é `ADMIN` e `*`. A senha fica no Infisical em `/database` (`DB_POSTGRES_ANALYTICS_USER` e
+`DB_POSTGRES_ANALYTICS_PASSWORD`), e `DB_POSTGRES_ANALYTICS` guarda o nome do banco do ambiente
+(`analyticsdb` em prod, `analyticsdbqa` em qa).
