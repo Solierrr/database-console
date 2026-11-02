@@ -107,14 +107,9 @@ TARGET ?= local
 ENVIRONMENT ?= local
 ROWS ?= 1000
 
-ifneq ($(filter qa QA "qa" "QA",$(ENVIRONMENT)),)
-	SUFIX = qa
-else
-	SUFIX =
-endif
-
 unquote = $(subst ",,$(1))
-DB_NAME = $(call unquote,$(TARGET))db$(SUFIX)
+# Os ambientes usam servidores Aiven diferentes com os mesmos nomes de banco (coredb, authdb, analyticsdb).
+DB_NAME = $(call unquote,$(TARGET))db
 # O .env do `make vault` traz DB_POSTGRES_*; o .env antigo trazia HOST, PORT, USER e PASSWORD.
 PG_HOST = $(call unquote,$(or $(DB_POSTGRES_HOST),$(HOST)))
 PG_PORT = $(call unquote,$(or $(DB_POSTGRES_PORT),$(PORT)))
