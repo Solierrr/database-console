@@ -1,0 +1,13 @@
+{
+  "description": "Scripts de modelagem de dados aplicados por cima do schema do Flyway, na ordem. Cada script é idempotente.",
+  "scripts": [
+    { "file": "10_star_schema.sql", "database": "core", "purpose": "Data Mart em esquema estrela (schema bi)" },
+    { "file": "20_bi_views.sql", "database": "core", "purpose": "Views analíticas com CTEs e funções de janela" },
+    { "file": "30_procedures.sql", "database": "core", "purpose": "Functions e Procedures de regras de negócio (schema regras)" },
+    { "file": "40_audit.sql", "database": "core", "purpose": "Auditoria por trigger em purchase_order, offer e proposal" },
+    { "file": "50_data_catalog.sql", "database": "core", "purpose": "Catálogo de dados (schema governance)" },
+    { "file": "60_dau.sql", "database": "auth", "purpose": "Registro de usuários ativos por dia (schema monitoring)" },
+    { "file": "70_recursiva.sql", "database": "core", "purpose": "Rede de conexões com CTE recursiva" },
+    { "file": "80_indexes.sql", "database": "core", "purpose": "Índices justificados por EXPLAIN ANALYZE" }
+  ]
+}

@@ -97,7 +97,7 @@ POWERSHELL ?= powershell
 else
 POWERSHELL ?= pwsh
 endif
-.PHONY: dev-up dev-db dev-down dev-status dev-seed schema seed-plan dataload reset reset-mongo connect backup roles-apply roles-check install-tools
+.PHONY: dev-up dev-db dev-down dev-status dev-seed schema seed-plan dataload reset reset-mongo connect backup roles-apply roles-check modelagem-list modelagem-apply modelagem-check install-tools
 
 
 
@@ -157,6 +157,15 @@ roles-apply: ## Create or refresh the consumer roles of coredb and authdb (ONLY=
 
 roles-check: ## Check the databases against the role contract (ONLY=consumer, ENVIRONMENT=qa for rpa_writer)
 	$(PY) scripts/roles.py check --environment $(call unquote,$(ENVIRONMENT)) $(if $(ONLY),--only $(ONLY),)
+
+modelagem-list: ## List the data modelling scripts of db/modelagem and the database of each one
+	$(PY) scripts/modelagem.py list
+
+modelagem-apply: ## Apply the data modelling scripts on top of the Flyway schema (DATABASE=core|auth, DRY_RUN=1 to validate and undo)
+	$(PY) scripts/modelagem.py apply $(if $(DATABASE),--database $(DATABASE),) $(if $(DRY_RUN),--dry-run,)
+
+modelagem-check: ## Check that the objects of the data modelling scripts exist (DATABASE=core|auth)
+	$(PY) scripts/modelagem.py check $(if $(DATABASE),--database $(DATABASE),)
 
 install-tools: ## Install PostgreSQL, Python and mongosh with winget (Windows)
 	winget install --id PostgreSQL.PostgreSQL.16 -e

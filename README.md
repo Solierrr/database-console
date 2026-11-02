@@ -14,7 +14,7 @@
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/Solierrr/database-console)](https://github.com/Solierrr/database-console/pulls)
 [![Release](https://img.shields.io/github/v/release/Solierrr/database-console)](https://github.com/Solierrr/database-console/releases)
 
-Este repositório reúne as operações de apoio aos dados da plataforma. A equipe pode preparar um ambiente local, carregar dados de desenvolvimento, conferir permissões e produzir cópias de segurança. Os dados de identidade e de negócio continuam sob responsabilidade dos serviços que os mantêm, enquanto o destino de indicadores possui uma configuração própria aqui.
+Este repositório reúne as operações de apoio aos dados da plataforma. A equipe pode preparar um ambiente local, carregar dados de desenvolvimento, conferir permissões, produzir cópias de segurança e aplicar os scripts de modelagem de dados (esquema estrela para BI, functions e procedures, auditoria por trigger, catálogo de dados, DAU e consulta recursiva) com `make modelagem-apply`. Os dados de identidade e de negócio continuam sob responsabilidade dos serviços que os mantêm, enquanto o destino de indicadores possui uma configuração própria aqui.
 
 Os utilitários usam Python, clientes PostgreSQL e scripts de sistema. Uma composição Docker fornece PostgreSQL e Redis no desenvolvimento. As credenciais são obtidas pelo Infisical. O destino de indicadores recebe resultados calculados no Databricks, com acesso por login e escopo, e não serve de origem para calcular esses indicadores.
 
