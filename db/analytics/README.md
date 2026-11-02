@@ -2,7 +2,7 @@
 
 `make create TARGET=analytics ENVIRONMENT=prod` cria `analyticsdb` sem apagar
 um banco existente. Depois, `make schema TARGET=analytics ENVIRONMENT=prod`
-aplica `db/analytics/schema.sql`. Para QA, use `ENVIRONMENT=qa` (`analyticsdbqa`).
+aplica `db/analytics/schema.sql`. O ambiente vem das credenciais (`make vault ENV=qa` ou `ENV=prod`): QA e PROD usam servidores diferentes com o mesmo nome de banco.
 Esses comandos não foram executados nesta alteração.
 
 O schema `gold` recebe tabelas com os mesmos nomes e colunas das
@@ -38,5 +38,5 @@ Cada requisição roda numa transação que chama `set_config('gold.scope', ...,
 `set_config('gold.entity_id', ..., true)`; `gold.can_read` só aceita esse contexto de um login `READER`.
 Sem contexto, ou com outro escopo ou entidade, o banco devolve zero linhas. Para o admin da plataforma o
 contexto é `ADMIN` e `*`. A senha fica no Infisical em `/database` (`DB_POSTGRES_ANALYTICS_USER` e
-`DB_POSTGRES_ANALYTICS_PASSWORD`), e `DB_POSTGRES_ANALYTICS` guarda o nome do banco do ambiente
-(`analyticsdb` em prod, `analyticsdbqa` em qa).
+`DB_POSTGRES_ANALYTICS_PASSWORD`), e `DB_POSTGRES_ANALYTICS` guarda o nome do banco (`analyticsdb`
+nos dois ambientes, em servidores diferentes).
