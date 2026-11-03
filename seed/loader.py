@@ -19,19 +19,46 @@ def load_plan(path):
     return apply_environment_overrides(yaml.safe_load(Path(path).read_text(encoding='utf-8')))
 
 
-def apply_environment_overrides(plan):
-    """No QA o seed so roda com uma senha propria (SEED_PASSWORD_HASH, bcrypt) e sem a conta de teste fixa.
+SHARED_ENVIRONMENTS = ('qa', 'prod')
 
-    A senha de desenvolvimento do plan.yaml e publica (esta no repositorio); por isso nunca vai para o QA.
+
+def apply_environment_overrides(plan):
+    """No QA e na producao o seed so roda com uma senha propria (SEED_PASSWORD_HASH, bcrypt) e sem a conta de teste fixa.
+
+    A senha de desenvolvimento do plan.yaml e publica (esta no repositorio); por isso nunca vai para QA nem producao.
     """
-    if os.environ.get('ENVIRONMENT', '').lower() != 'qa':
+    environment = os.environ.get('ENVIRONMENT', '').lower()
+    if environment not in SHARED_ENVIRONMENTS:
         return plan
     password_hash = os.environ.get('SEED_PASSWORD_HASH', '')
     if not password_hash.startswith(('$2a$', '$2b$', '$2y$')):
-        raise SystemExit('No QA defina SEED_PASSWORD_HASH com o bcrypt da senha das contas de teste do QA.')
-    plan['allowed_environments'] = [*plan.get('allowed_environments', []), 'qa']
+        raise SystemExit(f'Em {environment} defina SEED_PASSWORD_HASH com o bcrypt da senha das contas de teste.')
+    plan['allowed_environments'] = [*plan.get('allowed_environments', []), environment]
     plan['auth']['password_hash'] = password_hash
     plan.pop('dev_test_account', None)
+    return plan
+
+
+def scale_plan(plan, factor):
+    """Multiplica os volumes numericos do plano (tecnicos, servicos, propostas e modelos/ofertas de placa).
+
+    Empresas, unidades e contas fixas seguem como estao: os nomes sao listados no plano. A estrutura de casos de
+    borda continua a mesma e os IDs seguem deterministicos, entao a carga continua idempotente para um mesmo fator.
+    """
+    if factor < 1:
+        raise SystemExit('--scale precisa ser um inteiro maior ou igual a 1.')
+    if factor == 1:
+        return plan
+    technicians = plan['technicians']
+    technicians['professions'] = {name: count * factor for name, count in technicians['professions'].items()}
+    technicians['count'] *= factor
+    plan['services']['count'] *= factor
+    plan['proposals']['count'] *= factor
+    panels = plan['panels']
+    for family in panels['families']:
+        family['count'] *= factor
+    panels['models'] *= factor
+    panels['offers'] *= factor
     return plan
 
 

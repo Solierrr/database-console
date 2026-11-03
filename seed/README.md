@@ -19,15 +19,15 @@ ENVIRONMENT=local CLOUDINARY_CLOUD_NAME=<cloud do Solaria> python -m seed
 ENVIRONMENT=local python -m seed --reset
 ```
 
-Variáveis (mesma convenção do `dataload.py`): `HOST`, `PORT`, `USER`, `PASSWORD`, `SSLMODE` e `ENVIRONMENT`. Os bancos são `coredb` e `authdb`; use `SEED_CORE_DB` e `SEED_AUTH_DB` para outros nomes. O seed **recusa rodar** se `ENVIRONMENT` não estiver em `allowed_environments` do `plan.yaml` (`local` e `dev`), então nunca roda em QA ou produção.
+Variáveis (mesma convenção do `dataload.py`): `HOST`, `PORT`, `USER`, `PASSWORD`, `SSLMODE` e `ENVIRONMENT`. Os bancos são `coredb` e `authdb`; use `SEED_CORE_DB` e `SEED_AUTH_DB` para outros nomes. O seed **recusa rodar** se `ENVIRONMENT` não estiver em `allowed_environments` do `plan.yaml` (`local` e `dev`); QA e produção só entram com senha própria, como descrito abaixo.
 
-Opções: `--today AAAA-MM-DD` (data de referência das assinaturas, ofertas e serviços), `--strict-images` (falha se faltar imagem), `--core-only` (não toca no banco de auth), `--manifest` e `--plan`.
+Opções: `--today AAAA-MM-DD` (data de referência das assinaturas, ofertas e serviços), `--strict-images` (falha se faltar imagem), `--core-only` (não toca no banco de auth), `--scale N` (multiplica técnicos, serviços, propostas e placas do plano; empresas e unidades seguem como estão), `--manifest` e `--plan`.
 
 É idempotente: uma segunda execução não duplica nada (`ON CONFLICT DO NOTHING` em IDs derivados do plano). Datas relativas (assinaturas, validade das ofertas) são calculadas na primeira carga; use `--reset` e carregue de novo para renová-las.
 
-## Seed no QA
+## Seed no QA e em produção
 
-O QA aceita o seed só com uma senha própria: defina `ENVIRONMENT=qa` e `SEED_PASSWORD_HASH` (bcrypt da senha do QA, guardada no Infisical, nunca no repositório). Nesse modo todos os usuários usam essa senha e a conta `dev_test_account` (senha fixa do repositório) não é criada. Sem `SEED_PASSWORD_HASH` o seed recusa rodar. Produção continua fora: o seed nunca roda lá.
+O QA e a produção aceitam o seed só com uma senha própria: defina `ENVIRONMENT=qa` (ou `prod`) e `SEED_PASSWORD_HASH` (bcrypt da senha das contas de teste do ambiente, guardada no Infisical, nunca no repositório). Nesse modo todos os usuários usam essa senha e a conta `dev_test_account` (senha fixa do repositório) não é criada. Sem `SEED_PASSWORD_HASH` o seed recusa rodar. A carga em produção é uma decisão explícita de quem opera o ambiente: rode `--dry-run` antes, confira o relatório e use `--scale` só depois de uma primeira carga bem-sucedida.
 
 ## Login de desenvolvimento
 
