@@ -24,12 +24,13 @@ def apply_environment_overrides(plan):
 
     A senha de desenvolvimento do plan.yaml e publica (esta no repositorio); por isso nunca vai para o QA.
     """
-    if os.environ.get('ENVIRONMENT', '').lower() != 'qa':
+    environment = os.environ.get('ENVIRONMENT', '').lower()
+    if environment not in ('qa', 'prod'):
         return plan
     password_hash = os.environ.get('SEED_PASSWORD_HASH', '')
     if not password_hash.startswith(('$2a$', '$2b$', '$2y$')):
-        raise SystemExit('No QA defina SEED_PASSWORD_HASH com o bcrypt da senha das contas de teste do QA.')
-    plan['allowed_environments'] = [*plan.get('allowed_environments', []), 'qa']
+        raise SystemExit('No QA e em producao defina SEED_PASSWORD_HASH com o bcrypt da senha das contas de teste do QA.')
+    plan['allowed_environments'] = [*plan.get('allowed_environments', []), environment]
     plan['auth']['password_hash'] = password_hash
     plan.pop('dev_test_account', None)
     return plan
@@ -91,15 +92,27 @@ def resolve(value, references):
     return value
 
 
+# Nomes antigos de coluna ainda presentes no authdb implantado a partir do main do api-auth (baseline anterior)
+LEGACY_COLUMNS = {'local_credential': {'auth_user_id': 'user_id', 'is_password_change_required': 'must_change'}}
+
+
+def database_columns(cursor, table):
+    cursor.execute('SELECT column_name FROM information_schema.columns WHERE table_name = %s', (table,))
+    return {row[0] for row in cursor.fetchall()}
+
+
 def insert_rows(cursor, table, rows, references):
     if not rows:
         return 0
     columns = list(rows[0].keys())
+    legacy = LEGACY_COLUMNS.get(table)
+    present = database_columns(cursor, table) if legacy else set()
+    names = [legacy[c] if legacy and c in legacy and c not in present and legacy[c] in present else c for c in columns]
     for row in rows:
         if list(row.keys()) != columns:
             raise ValueError(f'Linhas de {table} com colunas diferentes')
     values = [tuple(resolve(row[column], references) for column in columns) for row in rows]
-    sql = f'INSERT INTO {table} ({", ".join(columns)}) VALUES %s ON CONFLICT DO NOTHING'
+    sql = f'INSERT INTO {table} ({", ".join(names)}) VALUES %s ON CONFLICT DO NOTHING'
     execute_values(cursor, sql, values, page_size=500)
     return cursor.rowcount
 

@@ -99,6 +99,13 @@ class Seeder:
     def insert(self, table: str, columns: list[str], rows: list[tuple], conflict: str = " ON CONFLICT DO NOTHING") -> None:
         if not rows:
             return
+        with self.conn.cursor() as cur:
+            cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name = %s", (table,))
+            present = {r[0] for r in cur.fetchall()}
+        # Nomes antigos de coluna ainda presentes nos bancos implantados do main (baseline anterior)
+        legacy = {"auth_user_id": "user_id", "is_password_change_required": "must_change", "is_email_verified": "email_verified",
+                  "auth_session_id": "session_id", "replaced_by_refresh_token_id": "replaced_by_id", "is_successful": "succeeded"}
+        columns = [legacy[c] if c not in present and legacy.get(c) in present else c for c in columns]
         col_list = ", ".join(columns)
         sql = f"INSERT INTO {table} ({col_list}) VALUES %s{conflict} RETURNING 1"
         with self.conn.cursor() as cur:
@@ -267,7 +274,7 @@ class Seeder:
             with self.conn.cursor() as cur:
                 execute_values(
                     cur,
-                    "UPDATE refresh_token AS rt SET replaced_by_refresh_token_id = data.next_id "
+                    "UPDATE refresh_token AS rt SET replaced_by_id = data.next_id "
                     "FROM (VALUES %s) AS data (prev_id, next_id) WHERE rt.id = data.prev_id",
                     chain_ids,
                 )
