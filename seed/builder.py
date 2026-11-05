@@ -353,7 +353,7 @@ class Builder:
                     user_id = self.dev_technician(group['company'], company_id, username)
                 else:
                     user_id, _, _ = self.user(f'dev:{username}', category, company_id, position, username=username)
-                self.dev_users.setdefault(company_id, {})[position] = user_id
+                self.dev_users.setdefault(company_id, {}).setdefault(position, user_id)
         if self.plan.get('dev_platform_admin'):
             user_id, _, _ = self.user('dev:platform-admin', 'users/pfp/staff', username=self.plan['dev_platform_admin'])
             self.add('platform_admin', {'id': uid('platform_admin', 'dev'), 'user_id': user_id, 'created_at': self.when(-90)})
@@ -402,14 +402,15 @@ class Builder:
         technician_id = uid('technician', 'dev', username)
         registration_id = uid('registration', 'dev', username)
         profession = next(iter(self.plan['technicians']['professions']))
+        number = str(100001 + int(str(uid('registration', 'number', username))[:6], 16) % 800000) if username != 'dev_tec_technician' else '100001'
         self.add('technician', {
-            'id': technician_id, 'person_id': person_id, 'crea': 'CREA-SP 100001', 'slug': f'{slugify(name)}-dev', 'status': 'APPROVED',
+            'id': technician_id, 'person_id': person_id, 'crea': f'CREA-SP {number}', 'slug': f'{slugify(name)}-dev', 'status': 'APPROVED',
         })
         self.add('professional_registration', {
             'id': registration_id, 'technician_id': technician_id, 'profession_id': Ref('profession', profession),
-            'council': 'CREA-SP', 'number': '100001', 'expires_at': self.when(720),
+            'council': 'CREA-SP', 'number': number, 'expires_at': self.when(720),
         })
-        self.approved_onboarding(user_id, technician_id, 'CREA-SP', '100001', self.when(720))
+        self.approved_onboarding(user_id, technician_id, 'CREA-SP', number, self.when(720))
         self.add('technician_affiliation', {
             'id': uid('affiliation', 'dev', username), 'company_id': company_id, 'technician_id': technician_id,
             'affiliation_type': 'AFFILIATED', 'is_active': True,

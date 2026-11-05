@@ -71,7 +71,24 @@ dev_accounts:
   - company: solmax               # fornecedor (distribuidora)
     accounts: [[dev_forn_admin, ADMIN], [dev_forn_manager, MANAGER], [dev_forn_sales, SALES]]
   - company: raio-de-sol          # fornecedor (empresa tecnica)
-    accounts: [[dev_tec_admin, ADMIN], [dev_tec_manager, MANAGER], [dev_tec_support, SUPPORT], [dev_tec_technician, TECHNICIAN]]
+    accounts: [[dev_tec_admin, ADMIN], [dev_tec_manager, MANAGER], [dev_tec_support, SUPPORT], [dev_tec_technician, TECHNICIAN], [dev_tec_technician2, TECHNICIAN], [dev_tec_technician3, TECHNICIAN]]
+  # Mais empresas com contas fixas, para testar chat e permissoes entre contas de empresas diferentes.
+  - company: grao-e-cia           # demandante
+    accounts: [[dev_grao_admin, ADMIN], [dev_grao_manager, MANAGER]]
+  - company: mercado-bom-preco    # demandante
+    accounts: [[dev_mercado_admin, ADMIN], [dev_mercado_support, SUPPORT]]
+  - company: nimbus-dc            # demandante
+    accounts: [[dev_nimbus_admin, ADMIN], [dev_nimbus_manager, MANAGER]]
+  - company: energia-prime        # fornecedor (distribuidora)
+    accounts: [[dev_energia_admin, ADMIN], [dev_energia_sales, SALES]]
+  - company: brasil-solar         # fornecedor (atacadista)
+    accounts: [[dev_brasil_admin, ADMIN], [dev_brasil_manager, MANAGER]]
+  - company: fotovolt             # fornecedor (empresa tecnica)
+    accounts: [[dev_fotovolt_admin, ADMIN], [dev_fotovolt_technician, TECHNICIAN], [dev_fotovolt_technician2, TECHNICIAN]]
+  - company: alvo-telhados        # fornecedor (empresa tecnica)
+    accounts: [[dev_alvo_admin, ADMIN], [dev_alvo_technician, TECHNICIAN]]
+  - company: conecta-eletrica     # fornecedor (empresa tecnica)
+    accounts: [[dev_conecta_admin, ADMIN], [dev_conecta_technician, TECHNICIAN]]
 dev_platform_admin: dev_platform_admin
 
 # Mix de status para testar filtros de analise (os demais ficam APPROVED).

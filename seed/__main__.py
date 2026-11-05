@@ -4,6 +4,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
+from .avatars import backfill_avatars
 from .builder import build_dataset
 from .images import DEFAULT_MANIFEST, ImagePool
 from .loader import check_environment, connect, load_dataset, load_plan
@@ -20,6 +21,7 @@ def parse_args(argv):
     parser.add_argument('--reset', action='store_true', help='Apaga apenas as linhas deste seed (IDs deterministicos).')
     parser.add_argument('--strict-images', action='store_true', help='Falha se algum pool de imagens nao tiver imagens suficientes.')
     parser.add_argument('--core-only', action='store_true', help='Nao toca no banco de auth.')
+    parser.add_argument('--backfill-avatars', action='store_true', help='Da foto de perfil aos usuarios sem foto (repete o pool quando acaba) e sai.')
     return parser.parse_args(argv)
 
 
@@ -41,6 +43,14 @@ def main(argv=None):
         raise SystemExit('Defina CLOUDINARY_CLOUD_NAME (nome da cloud) para montar as URLs das imagens.')
     today = date.fromisoformat(args.today) if args.today else date.today()
     pool = ImagePool(args.manifest, plan['rng_seed'], cloud or 'CLOUD_NAME', plan['cloudinary']['public_prefix'])
+    if args.backfill_avatars:
+        check_environment(plan)
+        core = connect('core')
+        try:
+            print(f'Usuarios que receberam foto de perfil: {backfill_avatars(pool, core)}')
+        finally:
+            core.close()
+        return 0
     dataset = build_dataset(plan, pool, today)
     print_report(dataset)
     if args.strict_images and any(row[3] for row in dataset.image_report):
