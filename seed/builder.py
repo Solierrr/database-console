@@ -19,7 +19,7 @@ CORE_TABLES = [
     'brand', 'model', 'offer', 'offer_translation', 'inventory', 'local_unit', 'unit_specification',
     'proposal', 'proposal_item', 'proposal_unit', 'cart', 'cart_item', 'purchase_order', 'order_item', 'order_payment',
     'professional_registration', 'professional_onboarding', 'certification',
-    'certification_record', 'technician_affiliation', 'technical_project', 'technical_service',
+    'certification_record', 'technician_affiliation', 'professional_team', 'professional_team_member', 'technical_project', 'technical_service',
     'service_executor', 'project_member', 'project_activity', 'project_history', 'project_photo', 'professional_review', 'user_photo', 'company_photo', 'local_unit_photo',
     'model_photo', 'platform_admin',
 ]
@@ -236,6 +236,7 @@ class Builder:
         self.build_orders()
         self.build_services()
         self.build_dev_accounts()
+        self.build_teams()
         self.build_projects()
         self.build_test_account()
         self.data.image_report = self.pool.report()
@@ -726,7 +727,32 @@ class Builder:
                 'id': affiliation_id, 'company_id': company['company_id'], 'technician_id': technician_id,
                 'affiliation_type': self.rng.choices(['AFFILIATED', 'PARTNER', 'INDEPENDENT'], [60, 25, 15])[0], 'is_active': True,
             })
-            self.technicians.append({'id': technician_id, 'affiliation': affiliation_id, 'user': user_id})
+            self.technicians.append({'id': technician_id, 'affiliation': affiliation_id, 'user': user_id, 'company': company['company_id'], 'status': statuses[index]})
+
+    # ---------- teams ----------
+    def build_teams(self):
+        # Equipes profissionais das empresas tecnicas, para o feed de equipes. So tecnicos aprovados entram (o catalogo
+        # publico so mostra equipes cujo responsavel e membros estejam aprovados e vinculados a empresa). Sem sorteio.
+        by_company = {}
+        for item in self.technicians:
+            if item['status'] == 'APPROVED':
+                by_company.setdefault(item['company'], []).append(item)
+        names = ['Equipe de instalacao', 'Equipe de manutencao e inspecao']
+        for company_id, members in by_company.items():
+            for index, name in enumerate(names):
+                chosen = members[index::2] or members
+                if len(chosen) < 1:
+                    continue
+                team_id = uid('professional_team', company_id, index)
+                self.add('professional_team', {
+                    'id': team_id, 'company_id': company_id, 'name': name,
+                    'responsible_technician_id': chosen[0]['id'], 'is_active': True,
+                })
+                for member in chosen:
+                    self.add('professional_team_member', {
+                        'id': uid('professional_team_member', team_id, member['id']),
+                        'professional_team_id': team_id, 'technician_id': member['id'],
+                    })
 
     # ---------- proposals ----------
     def build_proposals(self):
