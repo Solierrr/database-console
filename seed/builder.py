@@ -439,12 +439,14 @@ class Builder:
         dev_technician = next((users['TECHNICIAN'] for users in self.dev_users.values() if 'TECHNICIAN' in users), None)
         dev_projects = {row['id'] for row in rng.sample(core['technical_project'], min(5, len(core['technical_project'])))}             if dev_technician else set()
 
+        geolocations = {row['address_id']: row for row in core['geolocation']}
         for project in core['technical_project']:
             project_id = project['id']
             company_id = project['owner_company_id']
             admin_id = self.company_admin[company_id]
             segment = self.units_by_company[company_id]['segment']
             address = addresses[units[project['local_unit_id']]['address_id']]
+            geo = geolocations[address['id']]
             trade_name = companies[company_id]['trade_name']
             rows = sorted(services.get(project_id, []), key=lambda row: row['scheduled_at'])
             status = project_status([row['status'] for row in rows])
@@ -464,6 +466,9 @@ class Builder:
                 'location_neighborhood': address['neighborhood'], 'location_zip_code': address['zip_code'],
                 'location_street': address['street'], 'location_number': address['number'],
                 'location_complement': None,
+                # coordenadas do endereço da unidade: sem elas o mapa do app abre no meio do oceano
+                'location_latitude': geo['latitude'], 'location_longitude': geo['longitude'],
+                'location_geocoded_at': self.when(-1),
             })
 
             members = {admin_id: ('MANAGER', 'Responsável')}
