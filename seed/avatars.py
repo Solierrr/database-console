@@ -61,3 +61,35 @@ def backfill_avatars(pool, connection):
         done += 1
     connection.commit()
     return done
+
+
+def backfill_company_photos(pool, connection):
+    """Mesma ideia para empresas: logo (PROFILE) e banner (BANNER) das que ainda nao tem. Devolve (logos, banners)."""
+    cursor = connection.cursor()
+    banner_ids = sorted(image for category, ids in pool.by_category.items() if category.startswith('enterprises/banners/') for image in ids)
+    logo_ids = pool.by_category.get('enterprises/pfp') or []
+    counts = []
+    for kind, ids in (('PROFILE', logo_ids), ('BANNER', banner_ids)):
+        cursor.execute('SELECT url FROM company_photo WHERE type = %s', (kind,))
+        used_urls = {row[0] for row in cursor.fetchall()}
+        used = {image for image in ids if pool.url(image) in used_urls}
+        cursor.execute(
+            'SELECT c.id FROM company c WHERE NOT EXISTS '
+            '(SELECT 1 FROM company_photo p WHERE p.company_id = c.id AND p.type = %s) ORDER BY c.id', (kind,))
+        done = 0
+        for (company_id,) in cursor.fetchall():
+            if not ids:
+                break
+            image = pick(ids, used, company_id)
+            used.add(image)
+            crop = pool.crop_columns(image)
+            cursor.execute(
+                'INSERT INTO company_photo (company_id, type, url, public_id, crop_x, crop_y, crop_width, crop_height) '
+                'VALUES (%s, %s, %s, %s, %s, %s, %s, %s)',
+                (company_id, kind, pool.url(image), pool.public_id(image), crop['crop_x'], crop['crop_y'],
+                 crop['crop_width'], crop['crop_height']),
+            )
+            done += 1
+        counts.append(done)
+    connection.commit()
+    return tuple(counts)

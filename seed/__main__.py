@@ -4,7 +4,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from .avatars import backfill_avatars
+from .avatars import backfill_avatars, backfill_company_photos
 from .builder import build_dataset
 from .images import DEFAULT_MANIFEST, ImagePool
 from .loader import check_environment, connect, load_dataset, load_plan
@@ -21,7 +21,7 @@ def parse_args(argv):
     parser.add_argument('--reset', action='store_true', help='Apaga apenas as linhas deste seed (IDs deterministicos).')
     parser.add_argument('--strict-images', action='store_true', help='Falha se algum pool de imagens nao tiver imagens suficientes.')
     parser.add_argument('--core-only', action='store_true', help='Nao toca no banco de auth.')
-    parser.add_argument('--backfill-avatars', action='store_true', help='Da foto de perfil aos usuarios sem foto (repete o pool quando acaba) e sai.')
+    parser.add_argument('--backfill-avatars', action='store_true', help='Da foto de perfil aos usuarios e logo/banner as empresas sem foto (repete o pool quando acaba) e sai.')
     return parser.parse_args(argv)
 
 
@@ -48,6 +48,7 @@ def main(argv=None):
         core = connect('core')
         try:
             print(f'Usuarios que receberam foto de perfil: {backfill_avatars(pool, core)}')
+            print('Empresas que receberam logo e banner: %s' % (backfill_company_photos(pool, core),))
         finally:
             core.close()
         return 0
