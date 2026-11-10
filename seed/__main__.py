@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .builder import build_dataset
 from .images import DEFAULT_MANIFEST, ImagePool
-from .loader import check_environment, connect, load_dataset, load_plan
+from .loader import check_environment, connect, load_dataset, load_plan, scale_plan
 
 DEFAULT_PLAN = Path(__file__).resolve().parent / 'plan.yaml'
 
@@ -20,6 +20,7 @@ def parse_args(argv):
     parser.add_argument('--reset', action='store_true', help='Apaga apenas as linhas deste seed (IDs deterministicos).')
     parser.add_argument('--strict-images', action='store_true', help='Falha se algum pool de imagens nao tiver imagens suficientes.')
     parser.add_argument('--core-only', action='store_true', help='Nao toca no banco de auth.')
+    parser.add_argument('--scale', type=int, default=1, help='Multiplica tecnicos, servicos, propostas e placas do plano (padrao: 1).')
     return parser.parse_args(argv)
 
 
@@ -35,7 +36,7 @@ def print_report(dataset):
 
 def main(argv=None):
     args = parse_args(argv if argv is not None else sys.argv[1:])
-    plan = load_plan(args.plan)
+    plan = scale_plan(load_plan(args.plan), args.scale)
     cloud = os.environ.get('CLOUDINARY_CLOUD_NAME')
     if not cloud and not args.dry_run and not args.reset:
         raise SystemExit('Defina CLOUDINARY_CLOUD_NAME (nome da cloud) para montar as URLs das imagens.')

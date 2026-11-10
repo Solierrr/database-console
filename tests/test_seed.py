@@ -424,3 +424,34 @@ def test_local_nao_muda_o_plano(monkeypatch):
     monkeypatch.setenv('ENVIRONMENT', 'local')
     plan = {'allowed_environments': ['local', 'dev'], 'auth': {'password_hash': '$2a$10$publico'}, 'dev_test_account': {}}
     assert apply_environment_overrides(plan) == {'allowed_environments': ['local', 'dev'], 'auth': {'password_hash': '$2a$10$publico'}, 'dev_test_account': {}}
+
+
+def test_prod_exige_hash_proprio_e_nao_cria_a_conta_de_teste(monkeypatch):
+    import pytest
+    from seed.loader import apply_environment_overrides
+
+    plan = {'allowed_environments': ['local', 'dev'], 'auth': {'password_hash': '$2a$10$publico'}, 'dev_test_account': {'username': 'teste'}}
+    monkeypatch.setenv('ENVIRONMENT', 'prod')
+    monkeypatch.delenv('SEED_PASSWORD_HASH', raising=False)
+    with pytest.raises(SystemExit):
+        apply_environment_overrides(dict(plan))
+    monkeypatch.setenv('SEED_PASSWORD_HASH', '$2b$10$hashproprio')
+    result = apply_environment_overrides({**plan, 'auth': dict(plan['auth'])})
+    assert 'prod' in result['allowed_environments']
+    assert result['auth']['password_hash'] == '$2b$10$hashproprio'
+    assert 'dev_test_account' not in result
+
+
+def test_scale_multiplica_so_os_volumes_numericos():
+    import pytest
+    from seed.loader import load_plan, scale_plan
+
+    base = load_plan(ROOT / 'seed' / 'plan.yaml')
+    scaled = scale_plan(load_plan(ROOT / 'seed' / 'plan.yaml'), 3)
+    assert scaled['technicians']['count'] == base['technicians']['count'] * 3
+    assert sum(scaled['technicians']['professions'].values()) == scaled['technicians']['count']
+    assert scaled['services']['count'] == base['services']['count'] * 3
+    assert scaled['panels']['models'] == sum(family['count'] for family in scaled['panels']['families'])
+    assert scaled['demandants'] == base['demandants']
+    with pytest.raises(SystemExit):
+        scale_plan(load_plan(ROOT / 'seed' / 'plan.yaml'), 0)
